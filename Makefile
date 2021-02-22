@@ -1,6 +1,7 @@
 # https://www.kernel.org/doc/html/latest/kbuild/modules.html
 
 obj-m := pim_swap.o
+pim_swap-y := dpu.o
 
 ifeq ($(KERNELRELEASE),)
 KDIR ?= /usr/src/linux-headers-`uname -r`
