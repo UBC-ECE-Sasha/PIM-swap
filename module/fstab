@@ -1,0 +1,2 @@
+# turn sda into a swap partition
+/dev/sda none swap sw 0 0

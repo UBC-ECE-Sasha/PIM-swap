@@ -1,0 +1,5 @@
+config BR2_PACKAGE_PIMSWAP
+	bool "pimswap package"
+	depends on BR2_LINUX_KERNEL_EXT_PIMSWAP
+	help
+		PIMswap swapper

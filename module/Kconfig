@@ -1,0 +1,3 @@
+CFLAGS += -DDEBUG
+obj-$(CONFIG_PIMSWAP) := pimswap.o
+pim_swap-y := swap.o dpu.o seqread.o snappy_compress.o snappy_task.o 
