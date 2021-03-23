@@ -9,7 +9,7 @@
 #include "dpu.h"
 #include "seqread.h"
 
-#define NR_TASKLETS 12
+#define NR_TASKLETS 1
 #define STACK_SIZE_DEFAULT 256
 
 // Length of the "append window" in out_buffer_context
@@ -55,11 +55,21 @@ typedef struct out_buffer_context
 	uint32_t length;			// Total size of output buffer in bytes
 } out_buffer_context;
 
+#ifndef PAGE_SIZE
+#define PAGE_SIZE 4096
+#endif
+
+#define RESERVED_SIZE MEGABYTE(1)
+#define DIRECTORY_SIZE (MEGABYTE(3) - KILOBYTE(4) - sizeof(unsigned int))
+#define STORAGE_SIZE MEGABYTE(60)
+
 // MRAM buffers
 MRAM_VARS_START
-uint8_t __mram_noinit input_buffer[MEGABYTE(30)];
-uint8_t __mram_noinit in_page[KILOBYTE(4)];
-uint8_t __mram_noinit output_buffer[MEGABYTE(30)];
+uint8_t __mram_noinit reserved[RESERVED_SIZE];
+uint8_t __mram_noinit trans_page[PAGE_SIZE];
+uint32_t __mram_noinit id;
+uint8_t __mram_noinit directory[DIRECTORY_SIZE];
+uint8_t __mram_noinit storage[STORAGE_SIZE];
 MRAM_VARS_END
 
 /**
@@ -71,6 +81,8 @@ MRAM_VARS_END
  * @return SNAPPY_OK if successful, error code otherwise
  */
 snappy_status dpu_compress(struct in_buffer_context *input, struct out_buffer_context *output, uint32_t block_size);
+
+int snappy_compress_main(void);
 
 #endif
 

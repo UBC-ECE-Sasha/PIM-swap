@@ -2,7 +2,7 @@
 
 cc-flags-y := -DDEBUG
 obj-m := pim_swap.o
-pim_swap-y := swap.o dpu.o seqread.o snappy_compress.o snappy_task.o 
+pim_swap-y := swap.o dpu.o seqread.o snappy_compress.o snappy_task.o alloc_static.o
 
 ifeq ($(KERNELRELEASE),)
 KDIR ?= /usr/src/linux-headers-`uname -r`

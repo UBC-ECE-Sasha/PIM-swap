@@ -48,17 +48,19 @@ static inline void advance_seqread(struct in_buffer_context *input, uint32_t len
  */
 static inline uint32_t read_uint32(struct in_buffer_context *input, uint32_t offset)
 {
+	//printk("%s\n", __func__);
+	//printk("%s input %p curr %u ptr %p offset %u\n", __func__, input, input->curr, input->ptr, offset);
 	// Use the value from the sequential read cache if it's there
 	if ((offset - input->curr) < (SEQREAD_CACHE_SIZE - 4)) {
 		offset -= input->curr;
-		return (input->ptr[offset] |
-				(input->ptr[offset + 1] << 8) |
-				(input->ptr[offset + 2] << 16) |
-				(input->ptr[offset + 3] << 24));
+		return (WRAM_HEAP_PTR(input->ptr)[offset] |
+				(WRAM_HEAP_PTR(input->ptr)[offset + 1] << 8) |
+				(WRAM_HEAP_PTR(input->ptr)[offset + 2] << 16) |
+				(WRAM_HEAP_PTR(input->ptr)[offset + 3] << 24));
 	}
 	else {
 		uint8_t data_read[16];
-		mram_read(&input->buffer[WINDOW_ALIGN(offset, 8)], data_read, 16);
+		mram_read(MRAM_PTR(&input->buffer[WINDOW_ALIGN(offset, 8)]), data_read, 16);
 
 		offset %= 8;
 		return (data_read[offset] |
@@ -80,7 +82,7 @@ static inline uint32_t read_uint32(struct in_buffer_context *input, uint32_t off
 static inline void read_two_uint32(struct in_buffer_context *input, uint32_t offset, uint32_t data[2])
 {
 	uint8_t data_read[24];
-	mram_read(&input->buffer[WINDOW_ALIGN(offset, 8)], data_read, 24);
+	mram_read(MRAM_PTR(&input->buffer[WINDOW_ALIGN(offset, 8)]), data_read, 24);
 
 	offset %= 8;
 	
@@ -170,7 +172,7 @@ static void copy_output_buffer(struct in_buffer_context *input, struct out_buffe
 		if (curr_index >= OUT_BUFFER_LENGTH) {
 			dbg_printf("Past EOB - writing back output %d\n", output->append_window);
 
-			mram_write(output->append_ptr, &output->buffer[output->append_window], OUT_BUFFER_LENGTH);
+			mram_write(output->append_ptr, MRAM_PTR(&output->buffer[output->append_window]), OUT_BUFFER_LENGTH);
 			output->append_window += OUT_BUFFER_LENGTH;
 			curr_index -= OUT_BUFFER_LENGTH;
 		}
@@ -350,6 +352,7 @@ static void compress_block(struct in_buffer_context *input, struct out_buffer_co
 	const int32_t shift = 32 - log2_floor(table_size);
 	const uint32_t input_margin_bytes = 15;
 
+	printk("%s output @ %p\n", __func__, output);
 	// Make room for the compressed length
 	output->curr += 4;
 	output_start = output->curr;
@@ -359,9 +362,11 @@ static void compress_block(struct in_buffer_context *input, struct out_buffer_co
 	 * Or [next_emit, input_end) after the main loop.
 	 */
 	next_emit = curr_input;
+	//printk("A\n");
 
 	if (input_size >= input_margin_bytes) {
 		const uint32_t input_limit = curr_input + input_size - input_margin_bytes;
+	//printk("B\n");
 		
 		while (1) {
 			uint32_t next_hash = hash(input, read_uint32(input, ++curr_input), shift);
@@ -395,26 +400,31 @@ static void compress_block(struct in_buffer_context *input, struct out_buffer_co
 			uint32_t skip_bytes = 32;
 			uint32_t next_input = curr_input;
 			uint32_t candidate;
+	//printk("C\n");
 			do {
 				uint32_t hval;
 				uint32_t bytes_between_hash_lookups;
-
+				//printk("1\n");
 				curr_input = next_input;
 				hval = next_hash;
 				bytes_between_hash_lookups = skip_bytes++ >> 5;
 				next_input = curr_input + bytes_between_hash_lookups;
 
+				//printk("2\n");
 				if (next_input > input_limit) {
 					if (next_emit < input_end)
 						emit_literal(input, output, input_end - next_emit);
 					
+				//printk("3\n");
 					write_compressed_length(output, output_start - 4, output->curr - output_start);
 					return;
 				}		
 
+				//printk("4\n");
 				next_hash = hash(input, read_uint32(input, next_input), shift);
 				candidate = base_input + table[hval];
 				table[hval] = curr_input - base_input;
+				//printk("5\n");
 			} while (read_uint32(input, curr_input) != read_uint32(input, candidate));
 			
 			/*
@@ -422,6 +432,7 @@ static void compress_block(struct in_buffer_context *input, struct out_buffer_co
 			 * than 4 bytes match.	But, prior to the match, input bytes
 			 * [next_emit, input->curr) are unmatched.	Emit them as "literal bytes."
 			 */
+				//printk("6\n");
 			emit_literal(input, output, curr_input - next_emit);
 
 			/*
@@ -445,6 +456,7 @@ static void compress_block(struct in_buffer_context *input, struct out_buffer_co
 				const uint32_t base = curr_input;
 				int32_t matched = 4 + find_match_length(input, candidate + 4, curr_input + 4, input_end);
 				curr_input += matched;
+				//printk("7\n");
 				advance_seqread(input, matched);
 				
 				offset = base - candidate;
@@ -454,11 +466,13 @@ static void compress_block(struct in_buffer_context *input, struct out_buffer_co
 				 * We could immediately start working at input->curr now, but to improve
 				 * compression we first update table[Hash(input->curr - 1, ...)]/
 				 */
+				//printk("8\n");
 				next_emit = curr_input;
 				if (curr_input >= input_limit) {
 					if (next_emit < input_end)
 						emit_literal(input, output, input_end - next_emit);
 					
+				//printk("9\n");
 					write_compressed_length(output, output_start - 4, output->curr - output_start);
 					return;
 				}
@@ -468,6 +482,7 @@ static void compress_block(struct in_buffer_context *input, struct out_buffer_co
 				prev_hash = hash(input, prev_curr_bytes[0], shift);
 				table[prev_hash] = curr_input - base_input - 1;
 
+				//printk("10\n");
 				curr_hash = hash(input, prev_curr_bytes[1], shift);
 				candidate = base_input + table[curr_hash];
 				table[curr_hash] = curr_input - base_input;
@@ -488,20 +503,25 @@ snappy_status dpu_compress(struct in_buffer_context *input, struct out_buffer_co
 	uint16_t *table = (uint16_t *)mem_alloc(table_size);
 	
 	uint32_t length_remain = input->length;
+	printk("%s length=%u\n", __func__, length_remain);
+
 	while (input->curr < input->length) {
 		// Get the next block size to compress
 		uint32_t to_compress = MIN(length_remain, block_size);
 
 		// Reset the hash table
+		//printk("reset hash\n");
 		memset(table, 0, table_size);	
 	
 		// Compress the current block
+		//printk("compress block size %u\n", to_compress);
 		compress_block(input, output, to_compress, table, num_table_entries);
 	
 		length_remain -= to_compress;
 	}
 	
 	// Write out last buffer to MRAM
+	printk("writing last buffer\n");
 	output->length = output->curr;
 	if (output->append_window < output->length) {
 		uint32_t len_final = ALIGN(output->length % OUT_BUFFER_LENGTH, 8);

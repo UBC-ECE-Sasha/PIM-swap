@@ -2,15 +2,19 @@
 
 #include <linux/module.h>
 #include <linux/frontswap.h>
+#include <linux/crypto.h>
 #include "dpu.h"
 #include "snappy_compress.h"
+#include "mram.h"
+#include "alloc_static.h"
 
+#define USE_COMPRESSION
 #define NUM_RANKS 1
-#define DPU_INDEX_FROM_OFFSET(_offset) ((uint8_t)(_offset & ((1 << 6) - 1)))
-#define RANK_INDEX_FROM_OFFSET(_offset) ((uint8_t)(0)) // always rank 0 - for now
-
-// declare DPU entry point
-extern dpu_main snappy_main;
+// offset is divided like this: rank (1 bit) | id (31 bits) | dpu index (6 bits) |
+#define DPU_INDEX_FROM_OFFSET(_offset) ((uint8_t)(_offset & ((1 << __DPUS_PER_RANK_LOG2) - 1)))
+#define ID_FROM_OFFSET(_offset) ((uint32_t)(_offset >> __DPUS_PER_RANK_LOG2) & 0x7FFFFFFF)
+#define RANK_INDEX_FROM_OFFSET(_offset) ((uint8_t)(_offset >> 24))
+#define PAGE_VALID 0x80000000
 
 // command to select the DPU function
 enum {
@@ -20,29 +24,231 @@ enum {
 
 typedef struct page_descriptor {
 	uint8_t data[PAGE_SIZE];
+	uint32_t id;	// page identifier - high bit is used as 'page valid'
 } page_descriptor;
 
 static struct dpu_set_t dpus; // all allocated dpus
 static page_descriptor in_buffer[DPUS_PER_RANK]; // coming from the DPU
 static page_descriptor out_buffer[DPUS_PER_RANK]; // going to the DPU
-static uint64_t in_buffer_bmp;
 static uint64_t out_buffer_bmp;
+struct crypto_comp *tfm;
+static char *pimswap_compressor = "lzo";
+
+static __mram_ptr uint8_t *pimswap_alloc_page(unsigned int id, unsigned int length)
+{
+	__mram_ptr uint8_t *page;
+
+	//printk("%s: id=%u length=%u\n", __func__, id, length);
+
+	page = pimswap_alloc_page_static(id, length);
+
+	return page;
+}
+
+static void pimswap_free_page(unsigned int id)
+{
+	//printk("%s: id=%u\n", __func__, id);
+
+	pimswap_free_page_static(id);
+}
+
+static __mram_ptr uint8_t *pimswap_lookup_index(unsigned int id, unsigned int *length)
+{
+	//printk("%s: id=%u\n", __func__, id);
+
+	return pimswap_lookup_index_hash(id, length);
+}
+
+int dpu_invalidate_main(void)
+{
+	uint32_t id;
+
+	// read page ID
+	mram_read(MRAM_VAR(trans_page) + PAGE_SIZE, &id, sizeof(uint32_t));
+
+	if (!(id & PAGE_VALID)) {
+		return 0;
+	}
+	id &= ~PAGE_VALID; // remove valid flag
+
+	printk("[%u] Invalidating id %u\n", get_current_dpu(), id);
+	pimswap_free_page(id);
+	pimswap_insert_index_hash(id, 0, 0);
+
+	return 0;
+}
+
+int lzo_decompress_main(void)
+{
+	int ret;
+	uint32_t new_len = PAGE_SIZE;
+	uint32_t compressed_length;
+	uint8_t *out_page_w = NULL;
+	uint8_t *in_page_w = NULL;
+	__mram_ptr uint8_t *in_page_m = NULL;
+	uint32_t id;
+
+	//printk("%s\n", __func__);
+
+	// read page ID
+	mram_read(MRAM_VAR(trans_page) + PAGE_SIZE, &id, sizeof(uint32_t));
+
+	printk("[%u] Looking for id %u\n", get_current_dpu(), id);
+
+	// look up page location in MRAM
+	in_page_m = pimswap_lookup_index(id, &compressed_length);
+	if (!in_page_m) {
+		printk("Page %u not found in MRAM!\n", id);
+		return -1;
+	}
+
+	out_page_w = mem_alloc(PAGE_SIZE);
+	if (!out_page_w) {
+		printk("ERROR: allocating output page in wram\n");
+		return -1;
+	}
+	in_page_w = mem_alloc(PAGE_SIZE);
+	if (!in_page_w) {
+		printk("ERROR: allocating input page in wram\n");
+		return -1;
+	}
+
+	printk("Reading page from 0x%llx\n", (uint64_t)in_page_m);
+	if (compressed_length == PAGE_SIZE) {
+		// if it's not compressed, then we are done!
+		mram_read(in_page_m, out_page_w, compressed_length);
+	} else {
+		mram_read(in_page_m, in_page_w, compressed_length);
+
+	//print_hex_dump(KERN_ERR, "before decompress (w): ", DUMP_PREFIX_ADDRESS,
+	 //   32, 1, in_page_w, 32, false);
+
+		ret = crypto_comp_decompress(tfm, in_page_w, compressed_length, out_page_w, &new_len);
+		if (ret != 0) {
+			printk("ERROR: Decompression failed\n");
+			return -1;
+		}
+
+		if (new_len != PAGE_SIZE) {
+			printk("ERROR: decompressed size is wrong\n");
+			return -1;
+		}
+	}
+
+	//print_hex_dump(KERN_ERR, "after decompress (w): ", DUMP_PREFIX_ADDRESS,
+	 //   32, 1, out_page_w, 32, false);
+
+	// copy results to transfer page in MRAM
+	mram_write(out_page_w, MRAM_VAR(trans_page), PAGE_SIZE);
+
+	return 0;
+}
+
+/**
+	Entry point for DPU compression
+*/
+int lzo_compress_main(void)
+{
+	int ret;
+	uint32_t compressed_length = PAGE_SIZE;
+	uint8_t *out_page_w = NULL;
+	uint8_t *in_page_w = NULL;
+	__mram_ptr uint8_t *out_page_m = NULL;
+	uint32_t id;
+
+	//printk("%s\n", __func__);
+
+	// read page ID
+	mram_read(MRAM_VAR(trans_page) + PAGE_SIZE, &id, sizeof(uint32_t));
+	if (!(id & PAGE_VALID)) {
+		//printk("[%u] Ignoring invalid page\n", get_current_dpu());
+		return -1;
+	}
+	id &= ~PAGE_VALID; // remove valid flag
+	//printk("[%u] compress got id %u\n", get_current_dpu(), id);
+
+	//printk("in_page: 0x%llx\n", MRAM_VAR(in_page));
+
+	//d_page = vmalloc(PAGE_SIZE);
+
+	out_page_w = mem_alloc(PAGE_SIZE);
+	if (!out_page_w) {
+		printk("error allocating output page in wram\n");
+		return -1;
+	}
+	in_page_w = mem_alloc(PAGE_SIZE);
+	if (!in_page_w) {
+		printk("error allocating input page in wram\n");
+		return -1;
+	}
+
+	// copy the page from MRAM to WRAM
+	mram_read(MRAM_VAR(trans_page), in_page_w, PAGE_SIZE);
+	//in_page_m = get_current_dpu()->mram + MRAM_VAR(in_page);
+
+
+//	printk("Compressing from %p to %p (length=%u)\n", in_page_w, out_page, dlen);
+
+#ifdef USE_COMPRESSION
+	//print_hex_dump(KERN_ERR, "before compress (w): ", DUMP_PREFIX_ADDRESS,
+	 //   32, 1, in_page_w, 32, false);
+
+	ret = crypto_comp_compress(tfm, in_page_w, PAGE_SIZE, out_page_w, &compressed_length);
+	if (ret < 0) {
+		printk("Compression failed\n");
+		compressed_length = PAGE_SIZE;
+		out_page_w = in_page_w;
+	}
+#endif // USE_COMPRESSION
+
+	// don't store pages that are bigger than 3KB. It doesn't save any storage, and
+	// it would take time to decompress the results.
+	if (compressed_length >= KILOBYTE(3)) {
+		//printk("Compressed page is too big! (%u)\n", compressed_length);
+#ifdef STATISTICS
+		stats.uncompressable++;
+#endif // STATISTICS
+		compressed_length = PAGE_SIZE;
+		out_page_w = in_page_w;
+	}
+
+	// allocate a spot for it in MRAM
+	out_page_m = pimswap_alloc_page(id, compressed_length);
+
+	if (!out_page_m) {
+		printk("Can't allocate %u bytes\n", compressed_length);
+		return -1;
+	}
+	
+	// copy the page from WRAM to its new location in MRAM
+	mram_write(out_page_w, out_page_m, DPU_ALIGN(compressed_length, 8));
+
+#ifdef USE_COMPRESSION
+	//printk("Writing page to 0x%llx (length 0x%x)\n", (uint64_t)out_page_m, compressed_length);
+	//print_hex_dump(KERN_ERR, "after compress (m): ", DUMP_PREFIX_ADDRESS,
+	 //   32, 1, (uint8_t*)((uint64_t)out_page_m + get_dpu(get_current_dpu())->mram), 32, false);
+#endif // USE_COMPRESSION
+
+	//printk("%s done\n", __func__);
+
+	return 0;
+}
 
 static void pimswap_frontswap_init(unsigned type)
 {
-	pr_err("%s: \n", __func__);
 }
 
-/* compress and store a single page */
+/**
+	compress and store a single page
+
+	This is called by the mm subsystem when a page needs to be swapped out
+*/
 static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
 				struct page *page)
 {
 	uint8_t dpu_index, rank_index;
 	struct dpu_set_t dpu_rank;
 	void *src;
-	uint32_t dpu_cmd;
-
-	pr_err("store: type=%u offset=%lu\n", type, offset);
 
 	/* THP isn't supported */
 	if (PageTransHuge(page)) {
@@ -59,36 +265,59 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
 	// which rank and DPU will store this page
 	dpu_index = DPU_INDEX_FROM_OFFSET(offset);
 	rank_index = RANK_INDEX_FROM_OFFSET(offset);
-	pr_err("dpu: %u rank: %u\n", dpu_index, rank_index);
+	//pr_err("dpu: %u rank: %u\n", dpu_index, rank_index);
+	if (rank_index != 0) {
+		printk("ERROR: rank %u doesn't exist!\n", rank_index);
+		return -ENOSPC;
+	}
+
+	// TEMPORARY - ignore anything that isn't for DPU 0
+	//if (dpu_index != 0)
+	//	return -ENOSPC;
+
+	pr_err("store: offset=%lu\n", offset);
 
 	dpu_rank = dpus;
 
 	// if that buffer slot is already taken - submit the batch
 	if (out_buffer_bmp & (1ULL << dpu_index)) {
-		int dpu_id;
+		uint8_t dpu_id;
 		struct dpu_set_t dpu;
-		pr_err("buffer is full - flushing\n");
+
 		DPU_FOREACH(dpu_rank, dpu, dpu_id) {
-			dpu_prepare_xfer(dpu, &out_buffer[dpu_id].data);
+			//printk("Preparing xfer from %p for dpu %u\n", out_buffer[dpu_id].data, dpu_id);
+			dpu_prepare_xfer(dpu, out_buffer[dpu_id].data);
+			//print_hex_dump(KERN_ERR, "page: ", DUMP_PREFIX_ADDRESS,
+			//	32, 1, out_buffer[dpu_id].data, 32, false);
 		}
 
 		// copy the data
-		dpu_push_xfer(dpu_rank, DPU_XFER_TO_DPU, in_page, 0, PAGE_SIZE, DPU_XFER_DEFAULT);
+		dpu_push_xfer(dpu_rank, DPU_XFER_TO_DPU, trans_page, 0, sizeof(page_descriptor), DPU_XFER_DEFAULT);
 
-		// copy the command
-		dpu_cmd = COMMAND_STORE;
-		dpu_copy_to(dpu_rank, "command", 0, &dpu_cmd, sizeof(uint32_t));
-		pr_err("launching %u\n", rank_index);
+		// load and execute the program
+		dpu_load(dpu_rank, lzo_compress_main, NULL);
 		dpu_launch(dpu_rank, DPU_SYNCHRONOUS);
 		out_buffer_bmp = 0;
+
+		// clear out any pages that have been flushed (and their ids)
+		DPU_FOREACH(dpu_rank, dpu, dpu_id) {
+			out_buffer[dpu_id].id = 0;
+		}
 	}
 
 	// store the page in the buffer
 	out_buffer_bmp |= (1ULL << dpu_index);
 	src = kmap_atomic(page);
-	memcpy(&out_buffer[dpu_index], src, PAGE_SIZE);
+	memcpy(out_buffer[dpu_index].data, src, PAGE_SIZE);
 	kunmap_atomic(src);
-	pr_err("bitmap on rank %u: 0x%08llx\n", rank_index, out_buffer_bmp);
+
+	out_buffer[dpu_index].id = ID_FROM_OFFSET(offset) | PAGE_VALID;
+	//printk("Storing id %u\n", out_buffer[dpu_index].id);
+
+	//printk("Writing page to %p for dpu %u\n", out_buffer[dpu_index].data, dpu_index);
+	//	print_hex_dump(KERN_ERR, "page: ", DUMP_PREFIX_ADDRESS,
+	//	    32, 1, out_buffer[dpu_index].data, 32, false);
+	//pr_err("bitmap on rank %u: 0x%08llx\n", rank_index, out_buffer_bmp);
 
 	// success!
 	return 0;
@@ -104,44 +333,111 @@ static int pimswap_frontswap_load(unsigned type, pgoff_t offset,
 	uint8_t dpu_index, rank_index;
 	void *contents;
 	void *retrieved;
-	uint32_t dpu_cmd;
 	struct dpu_set_t dpu_rank;
+	uint8_t dpu_id;
+	struct dpu_set_t dpu, selected_dpu;
+	uint32_t page_id;
 
 	dpu_index = DPU_INDEX_FROM_OFFSET(offset);
 	rank_index = RANK_INDEX_FROM_OFFSET(offset);
-	pr_err("dpu: %u rank: %u\n", dpu_index, rank_index);
+	page_id = ID_FROM_OFFSET(offset);
+	if (rank_index != 0) {
+		printk("ERROR: rank %u doesn't exist!\n", rank_index);
+		return -1;
+	}
 
+	//printk("%s: offset: %lu dpu: %u rank: %u id: %u\n", __func__, offset, dpu_index, rank_index, page_id);
+
+	// select which rank to address
 	dpu_rank = dpus;
 
-	// check to see if its in the outgoing or incoming rank buffer
-	pr_err("bitmap on rank %u: 0x%08llx\n", rank_index, out_buffer_bmp);
-	if (out_buffer_bmp & (1ULL << dpu_index)) {
-		pr_err("in out buffer for rank %u\n", rank_index);
+	// check to see if its in the outgoing or incoming rank buffer (although not likely)
+	//pr_err("bitmap on rank %u: 0x%08llx\n", rank_index, out_buffer_bmp);
+	if (out_buffer_bmp & (1ULL << dpu_index) && out_buffer[dpu_index].id == page_id) {
+		printk("using out buffer for rank %u\n", rank_index);
 		retrieved = &out_buffer[dpu_index];
-	} else if (in_buffer_bmp & (1ULL << dpu_index)) {
-		pr_err("in in buffer for rank %u\n", rank_index);
+	//} else if (in_buffer_bmp & (1ULL << dpu_index) && in_buffer[dpu_index].id == page_id) {
+	} else if (in_buffer[dpu_index].id == page_id) {
+		printk("[%u] found id %u using in buffer\n", get_current_dpu(), page_id);
+		retrieved = &in_buffer[dpu_index];
+	} else {
+		// set the page id that we are looking for, only in the correct DPU
+		DPU_FOREACH(dpu_rank, dpu, dpu_id) {
+			if (dpu_id == dpu_index) {
+				in_buffer[dpu_id].id = page_id;
+				selected_dpu = dpu;
+			}
+			else
+				in_buffer[dpu_id].id = 0;
+			dpu_prepare_xfer(dpu, &in_buffer[dpu_id].id);
+		}
+		dpu_push_xfer(dpu_rank, DPU_XFER_TO_DPU, trans_page, PAGE_SIZE, sizeof(in_buffer[dpu_id].id), DPU_XFER_DEFAULT);
+
+		dpu_load(dpu_rank, lzo_decompress_main, NULL);
+
+		//dpu_launch(dpu_rank, DPU_SYNCHRONOUS);
+		dpu_launch(selected_dpu, DPU_SYNCHRONOUS);
+
+		// gather results into 'in' buffer
+		DPU_FOREACH(dpu_rank, dpu, dpu_id) {
+			dpu_prepare_xfer(dpu, in_buffer[dpu_id].data);
+		}
+		dpu_push_xfer(dpu_rank, DPU_XFER_FROM_DPU, trans_page, 0, sizeof(page_descriptor), DPU_XFER_DEFAULT);
+
+		if (in_buffer[dpu_index].id != ID_FROM_OFFSET(offset)) {
+			printk("Error retrieving buffer for offset %lu\n", offset);
+			return -1;
+		}
 		retrieved = &in_buffer[dpu_index];
 	}
 
-	// start reading specutively from the DPU in case there is a hit
-	dpu_cmd = COMMAND_LOAD;
-	dpu_copy_to(dpu_rank, "command", 0, &dpu_cmd, sizeof(uint32_t));
-	dpu_launch(dpu_rank, DPU_SYNCHRONOUS);
-
-	// now check the stored pages in case there is a miss
+//		print_hex_dump(KERN_ERR, "page read: ", DUMP_PREFIX_ADDRESS,
+//		    32, 1, retrieved, 32, false);
 
 	contents = kmap_atomic(page);
 	memcpy(contents, retrieved, PAGE_SIZE);
 	kunmap_atomic(contents);
 
-	pr_err("%s: don't know how to load!\n", __func__);
-	return -1;
+	return 0;
 }
 
 /* frees an entry in zswap */
 static void pimswap_frontswap_invalidate_page(unsigned type, pgoff_t offset)
 {
-	pr_err("%s: offset %lu\n", __func__, offset);
+	uint8_t dpu_index;
+	uint8_t rank_index;
+	uint32_t page_id;
+	uint8_t dpu_id;
+	struct dpu_set_t dpu_rank, dpu;
+
+	dpu_index = DPU_INDEX_FROM_OFFSET(offset);
+	rank_index = RANK_INDEX_FROM_OFFSET(offset);
+	page_id = ID_FROM_OFFSET(offset);
+	if (rank_index != 0) {
+		printk("ERROR: rank %u doesn't exist!\n", rank_index);
+	}
+
+	//printk("%s: offset: %lu dpu: %u rank: %u id: %u\n", __func__, offset, dpu_index, rank_index, page_id);
+
+	// select which rank to address
+	dpu_rank = dpus;
+
+	DPU_FOREACH(dpu_rank, dpu, dpu_id) {
+		out_buffer[dpu_id].id = page_id;
+		if (dpu_id == dpu_index)
+			out_buffer[dpu_id].id |= PAGE_VALID;
+		dpu_prepare_xfer(dpu, &out_buffer[dpu_id].id);
+	}
+	// copy the page id's to invalidate
+	dpu_push_xfer(dpu_rank, DPU_XFER_TO_DPU, trans_page, offsetof(struct page_descriptor, id), sizeof(uint32_t), DPU_XFER_DEFAULT);
+
+	dpu_load(dpu_rank, dpu_invalidate_main, NULL);
+
+	dpu_launch(dpu_rank, DPU_SYNCHRONOUS);
+
+	DPU_FOREACH(dpu_rank, dpu, dpu_id) {
+		out_buffer[dpu_id].id = 0;
+	}
 }
 
 /* frees all zswap entries for the given swap type */
@@ -167,19 +463,40 @@ static int __init init_pim_swap(void)
 		return -1;
 	}
 
+		// make sure it is zeroed
+		//memset(dpus[i].mram, 0, MRAM_PER_DPU);
+
+/* Load once if the program has compress + decompress combined
+	Right now, they are separate entry points, so are loaded individually
 	pr_err("loading\n");
-/*
 	if (dpu_load(dpus, snappy_main, NULL) != DPU_OK) {
 		pr_err("error in dpu_load\n");
 		return -2;
 	}
 */
 
+   tfm = crypto_alloc_comp(pimswap_compressor, 0, 0);
+   if (IS_ERR(tfm)) {
+      printk("could not alloc crypto comp %s : %ld\n",
+             pimswap_compressor, PTR_ERR(tfm));
+      return PTR_ERR(tfm);
+   }
+
 	// make sure 'write through' is off - we don't want to wait for slow
 	// swap devices.
 	frontswap_writethrough(false);
 
 	frontswap_register_ops(&pimswap_frontswap_ops);
+
+	printk("MRAM layout:\n");
+	printk("0x%04lx - 0x%4lx: reserved\n", offsetof(struct mram_layout, reserved), offsetofend(struct mram_layout, reserved));
+	printk("0x%04lx - 0x%4lx: transfer page\n", offsetof(struct mram_layout, trans_page), offsetofend(struct mram_layout, trans_page));
+	printk("0x%04lx - 0x%4lx: directory\n", offsetof(struct mram_layout, directory), offsetof(struct mram_layout, directory) + DIRECTORY_SIZE);
+	printk("0x%04lx - 0x%4lx: storage\n", offsetof(struct mram_layout, storage), offsetof(struct mram_layout, storage) + STORAGE_SIZE);
+
+#ifdef DIRECTORY_HASH
+	printk("Using a hash table with %lu entries\n", NUM_HASH_ENTRIES);
+#endif // DIRECTORY_HASH
 
 	pr_err("%s: done\n", __func__);
 	return 0;
@@ -190,6 +507,8 @@ static void __exit exit_pim_swap(void)
 	pr_err("%s: exit\n", __func__);
 
 	dpu_free(dpus);
+
+   crypto_free_comp(tfm);
 }
 
 module_init(init_pim_swap);

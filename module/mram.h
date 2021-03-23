@@ -17,8 +17,8 @@
  * @brief MRAM Transfer Management.
  */
 
-#define DPU_MRAM_HEAP_POINTER ((__mram_ptr void *)(&__sys_used_mram_end))
-extern __mram_ptr __dma_aligned uint8_t __sys_used_mram_end[0];
+//#define DPU_MRAM_HEAP_POINTER ((__mram_ptr void *)(&__sys_used_mram_end))
+//extern __mram_ptr __dma_aligned uint8_t __sys_used_mram_end[0];
 
 /**
  * @fn mram_read
@@ -33,10 +33,12 @@ extern __mram_ptr __dma_aligned uint8_t __sys_used_mram_end[0];
  * @param nb_of_bytes number of bytes to transfer
  */
 static inline void
-mram_read(const __mram_ptr void *from, void *to, unsigned int nb_of_bytes)
+mram_read(__mram_ptr void* from, void* to, unsigned int nb_of_bytes)
 {
-	from = (unsigned long)from + get_current_dpu()->mram;
-    memcpy(to, from, nb_of_bytes);
+	uint8_t *mram_src = (uint8_t*)((uint64_t)from + get_dpu(get_current_dpu())->mram);
+	uint8_t *wram_dest = to; //(void*)((uintptr_t)to + get_current_dpu()->wram);
+	//printk("%s: src 0x%llx to 0x%llx\n", __func__, (uint64_t)mram_src, (uint64_t)wram_dest);
+	memcpy(wram_dest, mram_src, nb_of_bytes);
 }
 
 /**
@@ -52,10 +54,12 @@ mram_read(const __mram_ptr void *from, void *to, unsigned int nb_of_bytes)
  * @param nb_of_bytes number of bytes to transfer
  */
 static inline void
-mram_write(const void *from, __mram_ptr void *to, unsigned int nb_of_bytes)
+mram_write(const void *from, __mram_ptr void* to, unsigned int nb_of_bytes)
 {
-	to = (unsigned long)to + get_current_dpu()->mram;
-	memcpy(to, from, nb_of_bytes);
+	const uint8_t *wram_src = from;
+	uint8_t *mram_dest = (uint8_t*)((uint64_t)to + get_dpu(get_current_dpu())->mram);
+	//printk("%s: src 0x%llx to 0x%llx\n", __func__, (uint64_t)wram_src, (uint64_t)mram_dest);
+	memcpy(mram_dest, wram_src, nb_of_bytes);
 }
 
 #endif /* DPUSYSCORE_MRAM_H */

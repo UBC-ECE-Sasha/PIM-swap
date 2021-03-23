@@ -16,9 +16,7 @@
 #define PAGE_OFF_MASK (PAGE_SIZE - 1)
 #define PAGE_IDX_MASK (~PAGE_OFF_MASK)
 
-#define MRAM_READ_PAGE(from, to) mram_read((__mram_ptr void *)(from), (void *)(to), PAGE_ALLOC_SIZE)
-
-#define __HEAP_POINTER ((unsigned long)get_current_dpu()->wram_heap_pointer)
+#define MRAM_READ_PAGE(from, to) mram_read((__mram_ptr void*)(from), (void *)(to), PAGE_ALLOC_SIZE)
 
 extern void *
 mem_alloc_nolock(size_t size);
@@ -26,7 +24,7 @@ mem_alloc_nolock(size_t size);
 seqreader_buffer_t
 __SEQREAD_ALLOC(void)
 {
-    unsigned long heap_pointer = __HEAP_POINTER;
+    uintptr_t heap_pointer = __WRAM_HEAP_POINTER;
     seqreader_buffer_t pointer = (seqreader_buffer_t)((heap_pointer + PAGE_OFF_MASK) & PAGE_IDX_MASK);
     size_t size = pointer + PAGE_ALLOC_SIZE - heap_pointer;
     /* We already compute the return pointer
@@ -39,8 +37,12 @@ __SEQREAD_ALLOC(void)
 void *
 __SEQREAD_INIT(seqreader_buffer_t cache, __mram_ptr void *mram_addr, seqreader_t *reader)
 {
+	printk("%s: mram_addr = %p\n", __func__, mram_addr);
+
     reader->wram_cache = cache;
     reader->mram_addr = (uintptr_t)(1 << __DPU_MRAM_SIZE_LOG2);
+	
+	//printk("%s: reader wram_cache = 0x%lx mram_addr = 0x%lx\n", __func__, reader->wram_cache, reader->mram_addr);
 
     return __SEQREAD_SEEK(mram_addr, reader);
 }
@@ -48,19 +50,26 @@ __SEQREAD_INIT(seqreader_buffer_t cache, __mram_ptr void *mram_addr, seqreader_t
 void *
 __SEQREAD_GET(void *ptr, uint32_t inc, seqreader_t *reader)
 {
+	printk("%s: %u bytes\n", __func__, inc);
 	// read 'inc' bytes
+	printk("%s not implemented!\n", __func__);
 	return NULL;
 }
 
 void *
 __SEQREAD_SEEK(__mram_ptr void *mram_addr, seqreader_t *reader)
 {
-    uintptr_t target_addr = (uintptr_t)mram_addr;
-    uintptr_t current_addr = (uintptr_t)reader->mram_addr;
-    uintptr_t wram_cache = (uintptr_t)reader->wram_cache;
-    uintptr_t mram_offset = target_addr - current_addr;
+    uint64_t target_addr = (uint64_t)mram_addr;
+    uint64_t current_addr = (uint64_t)reader->mram_addr;
+    uint64_t wram_cache = (uint64_t)reader->wram_cache;
+    uint64_t mram_offset = target_addr - current_addr;
+	printk("%s: target_addr = 0x%llx\n", __func__, target_addr);
+	printk("%s: current_addr = 0x%llx\n", __func__, current_addr);
+	printk("%s: wram_cache = 0x%llx\n", __func__, wram_cache);
+	printk("%s: mram_offset = 0x%llx\n", __func__, mram_offset);
     if ((mram_offset & PAGE_IDX_MASK) != 0) {
-        uintptr_t target_addr_idx_page = target_addr & PAGE_IDX_MASK;
+        uint64_t target_addr_idx_page = target_addr & PAGE_IDX_MASK;
+			//printk("%s: target_addr_idx_page = 0x%lx\n", __func__, target_addr_idx_page);
         MRAM_READ_PAGE(target_addr_idx_page, wram_cache);
         mram_offset = target_addr & PAGE_OFF_MASK;
         reader->mram_addr = target_addr_idx_page;

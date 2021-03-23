@@ -4,23 +4,26 @@
 #include <linux/types.h>
 
 //#define __DPU_MRAM_SIZE_LOG2 26
-#define __DPU_MRAM_SIZE_LOG2 23 
+#define __DPU_MRAM_SIZE_LOG2 25 
 #define MRAM_PER_DPU (1 << __DPU_MRAM_SIZE_LOG2)
-#define DPUS_PER_RANK 64
+#define __DPUS_PER_RANK_LOG2 6
+#define DPUS_PER_RANK (1 << __DPUS_PER_RANK_LOG2)
 
 #define DPU_ALLOCATE_ALL (U32_MAX)
 
 #define MRAM_VARS_START struct mram_layout {
 #define MRAM_VARS_END };
-#define MRAM_VAR(_x) (((struct mram_layout*)get_current_dpu()->mram)->_x)
+#define MRAM_VAR(_x) (MRAM_PTR(offsetof(struct mram_layout, _x)))
+#define MRAM_PTR(_x) ((__mram_ptr void*)(_x))
 #define MRAM_DPU(_i) (get_dpu(_i)->mram)
+#define __WRAM_HEAP_POINTER (get_dpu(get_current_dpu())->wram_heap)
+#define WRAM_HEAP_VAR(_x) (uint8_t*)((uint64_t)get_dpu(get_current_dpu())->wram + (uint64_t)_x)
+#define WRAM_HEAP_PTR(_x) ((uint64_t)(get_dpu(get_current_dpu())->wram) + _x)
 
 #define DPU_FOREACH(_set, _dpu, _id) \
-	for (_id=_set.start; _id < _set.end; _id++) \
-		_dpu.rank_id = _set.rank_id; \
-		_dpu.start = _id;
+	for (_id=_set.start, _dpu.start = _dpu.end = _id, _dpu.rank_id = _set.rank_id; _id <= _set.end; _id++, _dpu.start = _dpu.end = _id)
 
-typedef void(*dpu_main)(void);
+typedef int(*dpu_main)(void);
 
 typedef enum dpu_error_t {
     DPU_OK,
@@ -72,11 +75,12 @@ typedef enum _dpu_launch_policy_t {
 } dpu_launch_policy_t;
 
 struct dpu_state {
-	uint8_t flags;	// see STATE_FLAG_
 	dpu_main main; // main function
-	char *mram;
-	void *wram_heap_pointer;
+	uint8_t *mram;
+	uint8_t *wram;
 	int current_tasklet;
+	uint16_t wram_heap; // this counts from 0, so it is an offset into the wram field
+	uint8_t flags;	// see STATE_FLAG_
 };
 
 /* This definition allows for contiguous subsets of a particular rank, but
@@ -84,7 +88,7 @@ struct dpu_state {
 	I will always deal with one rank at time. */
 struct dpu_set_t {
 	uint8_t rank_id;
-	uint8_t start;	// if of first dpu from the rank
+	uint8_t start;	// id of first dpu in the rank
 	uint8_t end;	// id of last dpu in the rank (contiguous)
 };
 
@@ -93,7 +97,8 @@ struct dpu_set_t {
 /* which tasklet is currently executing */
 int me(void);
 
-struct dpu_state *get_current_dpu(void);
+//struct dpu_state *get_current_dpu(void);
+int get_current_dpu(void);
 struct dpu_state *get_dpu(uint8_t index);
 
 /* Actual API */
@@ -111,7 +116,8 @@ dpu_error_t __dpu_push_xfer(struct dpu_set_t dpu_set,
     dpu_xfer_flags_t flags);
 #define dpu_push_xfer(_dpu_set, _x, _n, _o, _l, _f) __dpu_push_xfer(_dpu_set, _x, offsetof(struct mram_layout, _n), _o, _l, _f)
 
-dpu_error_t dpu_copy_to(struct dpu_set_t dpu_set, const char *symbol_name, uint32_t symbol_offset, const void *src, size_t length);
+dpu_error_t __dpu_copy_to(struct dpu_set_t dpu_set, uint64_t symbol_addr, uint32_t symbol_offset, const void *src, size_t length);
+#define dpu_copy_to(_dpu_set, _symbol_name, _symbol_offset, _src, _length) __dpu_copy_to(_dpu_set, offsetof(struct mram_layout, _symbol_name), _symbol_offset, _src, _length)
 
 dpu_error_t dpu_load(struct dpu_set_t dpu_set, dpu_main main, void *prog_dummy);
 

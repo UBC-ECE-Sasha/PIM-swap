@@ -16,34 +16,57 @@ __host uint32_t output_length[NR_TASKLETS];
 __host uint32_t input_block_offset[NR_TASKLETS];
 __host uint32_t output_offset[NR_TASKLETS];
 
-int snappy_main(void)
+/** allocate some storage in the MRAM for this compressed data */
+static int alloc_storage_dynamic(int size)
+{
+	return 100;
+}
+
+snappy_status kernel_compress(struct in_buffer_context *input, struct out_buffer_context *output, uint32_t block_size)
+{
+	return SNAPPY_OK;
+}
+
+int snappy_compress_main(void)
 {
 	struct in_buffer_context input;
 	struct out_buffer_context output;
 	uint32_t input_start;
 	uint32_t output_start;
-	uint8_t idx = me();
+	uint8_t idx;
 
-	printf("DPU starting, tasklet %d\n", idx);
+	idx = me();
+	printf("DPU starting compress, tasklet %d\n", idx);
 	
 	// Check that this tasklet has work to run
 	if ((idx != 0) && (input_block_offset[idx] == 0)) {
-		//printf("Tasklet %d has nothing to run\n", idx);
+		printf("Tasklet %d has nothing to run\n", idx);
 		output_length[idx] = 0;
 		return 0;
 	}
 
+	input_block_offset[0] = 0;
+	block_size = 4096; // should be 32K but we don't have that much data!
+	input_length = 4096; // one 4K page to be compressed
+
 	// Prepare the input and output descriptors
 	input_start = (input_block_offset[idx] - input_block_offset[0]) * block_size;
-	output_start = output_offset[idx] - output_offset[0];
+	printk("input start: %u\n", input_start);
+	output_start = alloc_storage_dynamic(4096);
+	//output_start = output_offset[idx] - output_offset[0];
 
-	input.buffer = MRAM_VAR(input_buffer) + input_start;
+	printk("in_page: 0x%llx\n", (uint64_t)MRAM_VAR(trans_page));
+	input.buffer = (uint8_t*)(MRAM_VAR(trans_page) + input_start);
+	printk("input.buffer: %p\n", input.buffer);
 	input.cache = seqread_alloc();
-	input.ptr = seqread_init(input.cache, MRAM_VAR(input_buffer) + input_start, &input.sr);
+	input.ptr = seqread_init(input.cache, input.buffer, &input.sr);
 	input.curr = 0;
 	input.length = 0;
 
-	output.buffer = MRAM_VAR(output_buffer) + output_start;
+		print_hex_dump(KERN_ERR, "in_page: ", DUMP_PREFIX_ADDRESS,
+		    16, 1, get_dpu(get_current_dpu())->mram + (uintptr_t)input.buffer, 32, true);
+
+	output.buffer = (uint8_t*)(MRAM_VAR(storage) + output_start);
 	output.append_ptr = (uint8_t*)DPU_ALIGN(mem_alloc(OUT_BUFFER_LENGTH), 8);
 	output.append_window = 0;
 	output.curr = 0;
@@ -67,9 +90,11 @@ int snappy_main(void)
 		input.length = input_length - input_start;
 	}
 
+	printk("Input length: %u\n", input.length);
+
 	if (input.length != 0) {
-		// Do the uncompress
-		if (dpu_compress(&input, &output, block_size))
+		//if (dpu_compress(&input, &output, block_size))
+		if (kernel_compress(&input, &output, block_size))
 		{
 			return -1;
 		}
@@ -78,4 +103,3 @@ int snappy_main(void)
 
 	return 0;
 }
-
