@@ -62,6 +62,7 @@ static __mram_ptr uint8_t *pimswap_lookup_index(unsigned int id, unsigned int *l
 int dpu_invalidate_main(void)
 {
 	uint32_t id;
+	uint32_t length;
 
 	// read page ID
 	mram_read(MRAM_VAR(trans_page) + PAGE_SIZE, &id, sizeof(uint32_t));
@@ -73,7 +74,10 @@ int dpu_invalidate_main(void)
 
 	printk("[%u] Invalidating id %u\n", get_current_dpu(), id);
 	pimswap_free_page(id);
-	pimswap_insert_index_hash(id, 0, 0);
+
+	// the hash entry is not unique, so only remove it if it is the one we are looking for
+	if (pimswap_lookup_index_hash(id, &length))
+		pimswap_insert_index_hash(id, 0, 0);
 
 	return 0;
 }
@@ -93,7 +97,7 @@ int lzo_decompress_main(void)
 	// read page ID
 	mram_read(MRAM_VAR(trans_page) + PAGE_SIZE, &id, sizeof(uint32_t));
 
-	printk("[%u] Looking for id %u\n", get_current_dpu(), id);
+	//printk("[%u] Looking for id %u\n", get_current_dpu(), id);
 
 	// look up page location in MRAM
 	in_page_m = pimswap_lookup_index(id, &compressed_length);
@@ -113,7 +117,7 @@ int lzo_decompress_main(void)
 		return -1;
 	}
 
-	printk("Reading page from 0x%llx\n", (uint64_t)in_page_m);
+	//printk("Reading page from 0x%llx\n", (uint64_t)in_page_m);
 	if (compressed_length == PAGE_SIZE) {
 		// if it's not compressed, then we are done!
 		mram_read(in_page_m, out_page_w, compressed_length);
@@ -272,8 +276,8 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
 	}
 
 	// TEMPORARY - ignore anything that isn't for DPU 0
-	//if (dpu_index != 0)
-	//	return -ENOSPC;
+	if (dpu_index != 0)
+		return -ENOSPC;
 
 	pr_err("store: offset=%lu\n", offset);
 
@@ -312,7 +316,7 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
 	kunmap_atomic(src);
 
 	out_buffer[dpu_index].id = ID_FROM_OFFSET(offset) | PAGE_VALID;
-	//printk("Storing id %u\n", out_buffer[dpu_index].id);
+	//printk("Storing id %u\n", ID_FROM_OFFSET(offset));
 
 	//printk("Writing page to %p for dpu %u\n", out_buffer[dpu_index].data, dpu_index);
 	//	print_hex_dump(KERN_ERR, "page: ", DUMP_PREFIX_ADDRESS,
@@ -346,6 +350,11 @@ static int pimswap_frontswap_load(unsigned type, pgoff_t offset,
 		return -1;
 	}
 
+	// TEMPORARY - ignore anything that isn't for DPU 0
+	if (dpu_index != 0)
+		return -ENOSPC;
+
+	pr_err("load: offset=%lu\n", offset);
 	//printk("%s: offset: %lu dpu: %u rank: %u id: %u\n", __func__, offset, dpu_index, rank_index, page_id);
 
 	// select which rank to address
@@ -406,27 +415,44 @@ static void pimswap_frontswap_invalidate_page(unsigned type, pgoff_t offset)
 {
 	uint8_t dpu_index;
 	uint8_t rank_index;
-	uint32_t page_id;
 	uint8_t dpu_id;
 	struct dpu_set_t dpu_rank, dpu;
+	uint32_t invalidate_id;
+	uint32_t invalidate_id_dummy=0;
 
 	dpu_index = DPU_INDEX_FROM_OFFSET(offset);
 	rank_index = RANK_INDEX_FROM_OFFSET(offset);
-	page_id = ID_FROM_OFFSET(offset);
 	if (rank_index != 0) {
 		printk("ERROR: rank %u doesn't exist!\n", rank_index);
 	}
 
-	//printk("%s: offset: %lu dpu: %u rank: %u id: %u\n", __func__, offset, dpu_index, rank_index, page_id);
+	// TEMPORARY - ignore anything that isn't for DPU 0
+	if (dpu_index != 0)
+		return;
+
+	//pr_err("invalidate: offset=%lu\n", offset);
+
+	// maybe this page is sitting in the out buffer?
+	//printk("Out buffer: 0x%llx\n", out_buffer_bmp);
+	//printk("id %u for dpu %u\n", out_buffer[dpu_index].id & ~PAGE_VALID, dpu_index);
+	if (out_buffer_bmp & (1ULL << dpu_index) && (out_buffer[dpu_index].id & ~PAGE_VALID) == ID_FROM_OFFSET(offset)) {
+		printk("invalidating page in out buffer\n");
+		out_buffer_bmp &= ~(1ULL << dpu_index);
+		return;
+	}
+
+	//printk("%s: offset: %lu dpu: %u rank: %u id: %u\n", __func__, offset, dpu_index, rank_index, ID_FROM_OFFSET(offset));
 
 	// select which rank to address
 	dpu_rank = dpus;
 
 	DPU_FOREACH(dpu_rank, dpu, dpu_id) {
-		out_buffer[dpu_id].id = page_id;
-		if (dpu_id == dpu_index)
-			out_buffer[dpu_id].id |= PAGE_VALID;
-		dpu_prepare_xfer(dpu, &out_buffer[dpu_id].id);
+		if (dpu_id == dpu_index) {
+			invalidate_id = ID_FROM_OFFSET(offset) | PAGE_VALID;
+			dpu_prepare_xfer(dpu, &invalidate_id);
+		}
+		else
+			dpu_prepare_xfer(dpu, &invalidate_id_dummy);
 	}
 	// copy the page id's to invalidate
 	dpu_push_xfer(dpu_rank, DPU_XFER_TO_DPU, trans_page, offsetof(struct page_descriptor, id), sizeof(uint32_t), DPU_XFER_DEFAULT);
@@ -434,10 +460,6 @@ static void pimswap_frontswap_invalidate_page(unsigned type, pgoff_t offset)
 	dpu_load(dpu_rank, dpu_invalidate_main, NULL);
 
 	dpu_launch(dpu_rank, DPU_SYNCHRONOUS);
-
-	DPU_FOREACH(dpu_rank, dpu, dpu_id) {
-		out_buffer[dpu_id].id = 0;
-	}
 }
 
 /* frees all zswap entries for the given swap type */
@@ -494,6 +516,9 @@ static int __init init_pim_swap(void)
 	printk("0x%04lx - 0x%4lx: directory\n", offsetof(struct mram_layout, directory), offsetof(struct mram_layout, directory) + DIRECTORY_SIZE);
 	printk("0x%04lx - 0x%4lx: storage\n", offsetof(struct mram_layout, storage), offsetof(struct mram_layout, storage) + STORAGE_SIZE);
 
+	printk("Allocation table size: %lu\n", ALLOC_TABLE_SIZE);
+	printk("Total storage blocks: %d\n", NUM_STORAGE_BLOCKS);
+	printk("Storage block size: %d\n", STORAGE_BLOCK_SIZE);
 #ifdef DIRECTORY_HASH
 	printk("Using a hash table with %lu entries\n", NUM_HASH_ENTRIES);
 #endif // DIRECTORY_HASH

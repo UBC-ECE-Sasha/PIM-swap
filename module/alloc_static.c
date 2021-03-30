@@ -3,6 +3,53 @@
 #include "snappy_compress.h" // for mram layout
 #include "alloc_static.h"
 
+#define STATISTICS
+
+#ifdef STATISTICS
+static struct statistics {
+	uint64_t num_allocs;
+	uint64_t num_frees;
+	uint32_t current_blocks_allocated;
+	uint32_t current_bytes_used;
+} stats;
+
+void print_statistics(void)
+{
+	printk("STATS allocs: %llu frees: %llu blocks: %u  bytes: %u\n",
+		stats.num_allocs,
+		stats.num_frees,
+		stats.current_blocks_allocated,
+		stats.current_bytes_used);
+}
+#endif // STATISTICS
+
+/*
+static void dump_l1_bmp(uint8_t *l1_entries)
+{
+	printk("L1: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n", 
+		l1_entries[14],
+		l1_entries[13],
+		l1_entries[12],
+		l1_entries[11],
+		l1_entries[10],
+		l1_entries[9],
+		l1_entries[8],
+		l1_entries[7],
+		l1_entries[6],
+		l1_entries[5],
+		l1_entries[4],
+		l1_entries[3],
+		l1_entries[2],
+		l1_entries[1],
+		l1_entries[0]);
+}
+*/
+
+void dump_l2_section_bmp(uint32_t section, uint8_t *l2_entries)
+{
+	uint64_t *ptr = (uint64_t*)l2_entries;
+	printk("section %u: %08llx %08llx %08llx %08llx %08llx %08llx %08llx %08llx", section, ptr[7], ptr[6], ptr[5], ptr[4], ptr[3], ptr[2], ptr[1], ptr[0]);
+}
 
 #ifdef DIRECTORY_BTREE
 static void print_node(struct btree_node *n)
@@ -47,13 +94,9 @@ void pimswap_insert_index_hash(uint32_t id, __mram_ptr uint32_t block, uint32_t 
 	struct hash_entry entry;
 	uint8_t *entry_addr;
 
-	//printk("[%u] insert_index_hash id %u\n", get_current_dpu(), id);
-	//printk("Space available for hash: %lu\n", INDEX_SIZE);
-	//printk("Number of hash entries: %lu\n", NUM_HASH_ENTRIES);
-
 	// hash the id
 	entry_index = id % NUM_HASH_ENTRIES;
-	entry_addr = (uint8_t*)MRAM_VAR(directory) + offsetof(struct static_directory_hash, hash_table) + entry_index * sizeof(struct hash_entry);
+	entry_addr = HASH_ADDR_FROM_ENTRY(entry_index);
 
 	// load the entry
 	mram_read(entry_addr, &entry, DPU_ALIGN(sizeof(struct hash_entry), 8));
@@ -86,7 +129,7 @@ __mram_ptr uint8_t *pimswap_lookup_index_hash(unsigned int id, unsigned int *len
 
 	// hash the id - hopefully we get the same value as when we stored the item
 	entry_index = id % NUM_HASH_ENTRIES;
-	entry_addr = (uint8_t*)MRAM_VAR(directory) + offsetof(struct static_directory_hash, hash_table) + entry_index * sizeof(struct hash_entry);
+	entry_addr = HASH_ADDR_FROM_ENTRY(entry_index);
 
 	// load the entry
 	mram_read(entry_addr, &entry, DPU_ALIGN(sizeof(struct hash_entry), 8));
@@ -98,7 +141,7 @@ __mram_ptr uint8_t *pimswap_lookup_index_hash(unsigned int id, unsigned int *len
 		return MRAM_VAR(storage) + (entry.block << STORAGE_BLOCK_SIZE_LOG2);
 	} 
 
-	printk("length %u wrong or tag %u doesn't match %u\n", entry_index, entry.tag, id & 0xFFFF);
+	//printk("[%u] length %u wrong or tag %u doesn't match %u\n", get_current_dpu(), entry.length, entry.tag, TAG_FROM_ID(id));
 	*length = 0;
 	return 0;
 }
@@ -117,8 +160,6 @@ static void free_blocks_l2(uint32_t first_block, uint8_t num_blocks)
 	l2_entry = L2_ENTRY_FROM_BLOCK(first_block);
 	bit = L2_BIT_FROM_BLOCK(first_block);
 
-	//printk("Freeing %u blocks, starting at %u (section %u, entry %u, bit %u)\n", num_blocks, first_block, section, l2_entry, bit);
-
 	// read the l2 section into wram
 	section_addr = MRAM_VAR(directory) + DIR_LEVEL2_OFFSET + (section << ALLOC_TABLE_L2_ENTRIES_PER_SECTION_LOG2);
 	//printk("Reading %u L2 entries from %pS for section %u\n", ALLOC_TABLE_L2_ENTRIES_PER_SECTION, section_addr, section);
@@ -126,7 +167,8 @@ static void free_blocks_l2(uint32_t first_block, uint8_t num_blocks)
 
 	for (block = 0; block < num_blocks; block++) {
 		if (l2_entry >= ALLOC_TABLE_L2_ENTRIES_PER_SECTION) {
-			pr_err("l2_entry is too big for this section!\n");
+			pr_err("l2_entry is too big for this section! (%u)\n", l2_entry);
+			printk("Freeing %u blocks, starting at %u (section %u, entry %u, bit %u)\n", num_blocks, first_block, section, l2_entry, bit);
 			break;
 		}
 
@@ -138,6 +180,7 @@ static void free_blocks_l2(uint32_t first_block, uint8_t num_blocks)
 			l2_entry++;
 		}
 	}
+	//dump_l2_section_bmp(section, l2_entries);
 
 	mram_write(l2_entries, section_addr, ALLOC_TABLE_L2_ENTRIES_PER_SECTION);
 }
@@ -146,11 +189,11 @@ static uint32_t find_free_blocks_l2(uint32_t section, uint8_t num_blocks, uint8_
 {
 	uint8_t l2_entry;
 	uint8_t bit;
-	uint8_t found;
+	uint8_t found=0;
 	uint8_t check_l2=0;
 	uint8_t *section_addr;
 	uint32_t first_block;
-	uint8_t l2_entries[DPU_ALIGN(ALLOC_TABLE_L2_ENTRIES_PER_SECTION, 8)];
+	uint8_t l2_entries[ALLOC_TABLE_L2_ENTRIES_PER_SECTION];
 
 	// read the l2 section into wram
 	section_addr = MRAM_VAR(directory) + DIR_LEVEL2_OFFSET + (section << ALLOC_TABLE_L2_ENTRIES_PER_SECTION_LOG2);
@@ -158,22 +201,19 @@ static uint32_t find_free_blocks_l2(uint32_t section, uint8_t num_blocks, uint8_
 	mram_read(section_addr, l2_entries, ALLOC_TABLE_L2_ENTRIES_PER_SECTION);
 
 	// look for 'num_blocks' consecutive bits in this section
+	//dump_l2_section_bmp(section, l2_entries);
 	for (l2_entry=0; l2_entry < ALLOC_TABLE_L2_ENTRIES_PER_SECTION; l2_entry++) {
-		//printk("l2_entries[%u] = 0x%02x\n", l2_entry, l2_entries[l2_entry]); 
 
 		if (l2_entries[l2_entry] == 0xFF)
 			continue;
 
 		// look at each bit in this entry
+		//printk("Looking at entry %u\n", l2_entry);
 		for (bit=0; bit < L2_BITS_PER_ENTRY; bit++) {
 			if (!(l2_entries[l2_entry] & (1 << bit))) {
 				if (!found) {
-					//first_section = section;
-					//first_entry = l2_entry;
-					//first_bit = bit;
 					first_block = MAKE_BLOCK_FROM_L2(section, l2_entry, bit); // remember the first block in the set
-					//printk("First block %u\n", first_block);
-					//printk("section %u, entry %u, bit %u\n", section, l2_entry, bit);
+					//printk("Num blocks %u First block %u section %u, entry %u, bit %u\n", num_blocks, first_block, section, l2_entry, bit);
 				}
 				found++;
 				if (found == num_blocks) {
@@ -202,8 +242,6 @@ static uint32_t find_free_blocks_l2(uint32_t section, uint8_t num_blocks, uint8_
 		if (l2_entries[l2_entry] == 0xFF)
 			check_l2 = 1;
 
-		//printk("l2_entries[%u] = 0x%02x\n", l2_entry, l2_entries[l2_entry]); 
-
 		if (bit == 0) {
 			l2_entry--;
 			bit = L2_BITS_PER_ENTRY - 1;
@@ -211,6 +249,7 @@ static uint32_t find_free_blocks_l2(uint32_t section, uint8_t num_blocks, uint8_
 			bit--;
 		}
 	}
+	//dump_l2_section_bmp(section, l2_entries);
 
 	// mark the l2 entries as used
 	//print_hex_dump(KERN_ERR, "l2_entries ", DUMP_PREFIX_NONE, ALLOC_TABLE_L2_ENTRIES_PER_SECTION, 1, l2_entries, ALLOC_TABLE_L2_ENTRIES_PER_SECTION, false);
@@ -238,25 +277,25 @@ __mram_ptr uint8_t *pimswap_alloc_page_static(unsigned int id, unsigned int leng
 	uint8_t num_blocks;
 	uint32_t first_block;
 	uint8_t update_l1=1;
+	uint32_t section;
 
 	num_blocks = (length + (STORAGE_BLOCK_SIZE-1)) >> STORAGE_BLOCK_SIZE_LOG2;
 
-	//printk("%s length %u num blocks: %u\n", __func__, length, num_blocks);
-
-	//printk("Storage size: %u\n", STORAGE_SIZE);
-	//printk("Storage block size: %u\n", STORAGE_BLOCK_SIZE);
-	//printk("Num storage blocks: %u\n", NUM_STORAGE_BLOCKS);
+	//printk("%s: id %u\n", __func__, id);
 
 	// read level 1 allocation table from MRAM to WRAM
 	//printk("Reading %lu bytes for L1 alloc table\n", DPU_ALIGN(ALLOC_TABLE_L1_ENTRIES, 8));
 	mram_read(MRAM_VAR(directory) + DIR_LEVEL1_OFFSET, l1_entries, DPU_ALIGN(ALLOC_TABLE_L1_ENTRIES, 8));
+	//dump_L1(l1_entries);
 
 	// look for a section that has at least one free block
 	for (l1_entry=0; l1_entry < ALLOC_TABLE_L1_ENTRIES; l1_entry++) {
 		if (l1_entries[l1_entry] != 0xFF) {
 			for (l1_bit=0; l1_bit < 8; l1_bit++) {
 				if (!(l1_entries[l1_entry] & (1 << l1_bit))) {
-					first_block = find_free_blocks_l2(L1_MAKE_SECTION(l1_entry, l1_bit), num_blocks, &update_l1);
+					section = L1_MAKE_SECTION(l1_entry, l1_bit);
+					//printk("section %u = l1_entry=%u l1_bit=%u\n", section, l1_entry, l1_bit);
+					first_block = find_free_blocks_l2(section, num_blocks, &update_l1);
 					if (first_block != UINT_MAX)
 						break;
 				}
@@ -273,16 +312,17 @@ __mram_ptr uint8_t *pimswap_alloc_page_static(unsigned int id, unsigned int leng
 	}
 
 	if (update_l1) {
-		printk("Section %u is full - updating L1\n", L1_MAKE_SECTION(l1_entry, l1_bit));
+		//printk("Section %u is full - updating L1\n", L1_MAKE_SECTION(l1_entry, l1_bit));
 		l1_entries[l1_entry] |= (1 << l1_bit);
 		mram_write(l1_entries, MRAM_VAR(directory) + DIR_LEVEL1_OFFSET, DPU_ALIGN(ALLOC_TABLE_L1_ENTRIES, 8));
 	}
 
 #ifdef STATISTICS
 	// collect some interesting statistics
-	stats.num_allocations++;
-	stats.current_bytes_allocated += (num_blocks << STORAGE_BLOCK_SIZE_LOG2);
+	stats.num_allocs++;
+	stats.current_blocks_allocated += num_blocks;
 	stats.current_bytes_used += length;
+	print_statistics();
 #endif // STATISTICS
 
 	pimswap_insert_index_hash(id, first_block, length);
@@ -312,14 +352,6 @@ void pimswap_free_page_static(unsigned int id)
 	num_blocks = (length + (STORAGE_BLOCK_SIZE-1)) >> STORAGE_BLOCK_SIZE_LOG2;
 
 	//printk("%s length %u num blocks: %u\n", __func__, length, num_blocks);
-
-	//printk("Storage size: %u\n", STORAGE_SIZE);
-	//printk("Storage block size: %u\n", STORAGE_BLOCK_SIZE);
-	//printk("Num storage blocks: %u\n", NUM_STORAGE_BLOCKS);
-
-	// read level 1 allocation table from MRAM to WRAM
-	//printk("Reading %lu bytes for L1 alloc table\n", DPU_ALIGN(ALLOC_TABLE_L1_ENTRIES, 8));
-
 	free_blocks_l2(first_block, num_blocks);
 
 	// check to see if the l1 needs updating
@@ -328,9 +360,16 @@ void pimswap_free_page_static(unsigned int id)
 	l1_bit = L1_BIT_FROM_SECTION(section);
 	mram_read(MRAM_VAR(directory) + DIR_LEVEL1_OFFSET, l1_entries, DPU_ALIGN(ALLOC_TABLE_L1_ENTRIES, 8));
 	if (l1_entries[l1_entry] & (1 << l1_bit)) {
-		printk("Section is no longer full - updating L1\n");
+		//printk("Section is no longer full - updating L1\n");
 		l1_entries[l1_entry] &= ~(1 << l1_bit);
 		mram_write(l1_entries, MRAM_VAR(directory) + DIR_LEVEL1_OFFSET, DPU_ALIGN(ALLOC_TABLE_L1_ENTRIES, 8));
 	}
+
+#ifdef STATISTICS
+	stats.num_frees++;
+	stats.current_blocks_allocated -= num_blocks;
+	stats.current_bytes_used -= length;
+	print_statistics();
+#endif // STATISTICS
 }
 

@@ -85,6 +85,7 @@ maximum number of nodes = 28^(h+1)-1 = 262144 !Cannot fit!
 #define STORAGE_BLOCK_FROM_ADDRESS(_address) (((uint64_t)_address - (uint64_t)MRAM_VAR(storage)) >> STORAGE_BLOCK_SIZE_LOG2)
 #define TAG_FROM_ID(_x) (_x & 0xFFFF)
 
+#define HASH_ADDR_FROM_ENTRY(_entry) ((uint8_t*)MRAM_VAR(directory) + offsetof(struct static_directory_hash, hash_table) + _entry * sizeof(struct hash_entry))
 
 /***************/
 #ifdef DIRECTORY_BTREE
