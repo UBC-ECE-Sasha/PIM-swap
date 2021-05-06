@@ -2,7 +2,9 @@
 #define _ALLOC_STATIC__H
 
 #include "common.h"
+#include "dpu.h"
 
+#define STATISTICS
 #define DIRECTORY_HASH
 
 // The directory is used to organize space in the storage area, and is arranged in 2 parts: the allocation table and the file table
@@ -52,15 +54,24 @@ maximum number of nodes = 28^(h+1)-1 = 262144 !Cannot fit!
 
 // maybe a B-tree?
 
-#define ALLOC_TABLE_L1_ENTRIES	15 
-#define ALLOC_TABLE_L2_ENTRIES 7680
-#define ALLOC_TABLE_L2_ENTRIES_PER_SECTION_LOG2 6
-#define ALLOC_TABLE_L2_ENTRIES_PER_SECTION (1 << ALLOC_TABLE_L2_ENTRIES_PER_SECTION_LOG2)
+#ifndef PAGE_SIZE
+#define PAGE_SIZE 4096
+#endif
 
-#define STORAGE_BLOCK_SIZE_LOG2 10
+#define RESERVED_SIZE MEGABYTE(1)
+#define DIRECTORY_SIZE (MEGABYTE(3) - KILOBYTE(4) - sizeof(unsigned int))
+#define STORAGE_SIZE (MRAM_PER_DPU - MEGABYTE(4))
+
+#define ALLOC_TABLE_L1_ENTRIES (ALLOC_TABLE_L2_ENTRIES >> (6 + 3)) //15
+#define ALLOC_TABLE_L2_ENTRIES (NUM_STORAGE_BLOCKS >> L2_BITS_PER_ENTRY_LOG2) //7680
+#define ALLOC_TABLE_L2_ENTRIES_PER_SECTION_LOG2 6 // 64-byte section
+#define ALLOC_TABLE_L2_ENTRIES_PER_SECTION (1 << ALLOC_TABLE_L2_ENTRIES_PER_SECTION_LOG2)
+#define NUM_L2_SECTIONS (ALLOC_TABLE_L2_ENTRIES >> ALLOC_TABLE_L2_ENTRIES_PER_SECTION_LOG2)
+
+#define STORAGE_BLOCK_SIZE_LOG2 6
 #define STORAGE_BLOCK_SIZE (1 << STORAGE_BLOCK_SIZE_LOG2)
 #define NUM_STORAGE_BLOCKS (STORAGE_SIZE >> STORAGE_BLOCK_SIZE_LOG2)
-#define MAX_CONSECUTIVE_BLOCKS 4
+#define MAX_CONSECUTIVE_BLOCKS (PAGE_SIZE >> STORAGE_BLOCK_SIZE_LOG2)
 
 #define ALLOC_TABLE_SIZE (ALLOC_TABLE_L1_SIZE + ALLOC_TABLE_L2_SIZE)
 #define INDEX_SIZE (DIRECTORY_SIZE - ALLOC_TABLE_SIZE)
@@ -85,7 +96,17 @@ maximum number of nodes = 28^(h+1)-1 = 262144 !Cannot fit!
 #define STORAGE_BLOCK_FROM_ADDRESS(_address) (((uint64_t)_address - (uint64_t)MRAM_VAR(storage)) >> STORAGE_BLOCK_SIZE_LOG2)
 #define TAG_FROM_ID(_x) (_x & 0xFFFF)
 
-#define HASH_ADDR_FROM_ENTRY(_entry) ((uint8_t*)MRAM_VAR(directory) + offsetof(struct static_directory_hash, hash_table) + _entry * sizeof(struct hash_entry))
+#define HASH_ADDR_FROM_ENTRY(_entry) ((uint8_t*)MRAM_VAR(directory) + offsetof(struct static_directory_hash, hash_table) + _entry * sizeof(struct pim_hash_entry))
+
+// MRAM buffers
+MRAM_VARS_START
+uint8_t __mram_noinit reserved[RESERVED_SIZE];
+uint8_t __mram_noinit trans_page[PAGE_SIZE];
+uint32_t __mram_noinit id;
+uint32_t __mram_noinit status;
+uint8_t __mram_noinit directory[DIRECTORY_SIZE];
+uint8_t __mram_noinit storage[STORAGE_SIZE];
+MRAM_VARS_END
 
 /***************/
 #ifdef DIRECTORY_BTREE
@@ -119,7 +140,7 @@ struct static_directory_btree {
 #define ALLOC_TABLE_L2_SIZE (sizeof_field(struct static_directory_hash, dir_level2))
 #define DIR_LEVEL1_OFFSET offsetof(struct static_directory_hash, dir_level1)
 #define DIR_LEVEL2_OFFSET offsetof(struct static_directory_hash, dir_level2)
-#define HASH_ENTRY_SIZE (sizeof(struct hash_entry))
+#define HASH_ENTRY_SIZE (sizeof(struct pim_hash_entry))
 #define NUM_HASH_ENTRIES (INDEX_SIZE / HASH_ENTRY_SIZE)
 
 struct static_directory_hash {
@@ -128,17 +149,28 @@ struct static_directory_hash {
 	uint8_t hash_table[0];
 };
 
-struct hash_entry {
+struct pim_hash_entry {
+	uint32_t block;
 	uint16_t tag;
-	uint16_t block;
 	uint16_t length;
-	uint16_t padding;
 };
 
 #else
 	#error You must define a DIRECTORY style
 #endif // DIRECTORY_BTREE
 /***************/
+
+#ifdef STATISTICS
+static struct statistics {
+	uint64_t num_allocs;
+	uint64_t num_frees;
+	uint64_t current_pages;
+	uint32_t current_blocks_allocated;
+	uint32_t current_bytes_used;
+	uint32_t uncompressable;
+} stats;
+#endif // STATISTICS
+
 __mram_ptr uint8_t *pimswap_alloc_page_static(unsigned int id, unsigned int length);
 void pimswap_free_page_static(unsigned int id);
 

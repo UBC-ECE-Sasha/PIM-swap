@@ -10,3 +10,6 @@ buildroot-setup:
 
 tags:
 	ctags -R -f tags module
+
+graphs:
+	all-graphs.sh

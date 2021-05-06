@@ -1,14 +1,13 @@
 #!/usr/bin/python
 
-# graph the utilization over time
-
 import pandas as pd
 import argparse
 import matplotlib.pyplot as plt
 
+input_file = "utilization.csv"
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--csv', '-f', help="input CSV file", required=True)
-parser.add_argument('--blocksize', '-b', help="block size (in bytes)", required=True)
 args = parser.parse_args()
 
 # read raw data from CSV into a dataframe
@@ -26,27 +25,29 @@ resample = int(best / max_data_points)
 df = df.iloc[::resample, :]
 
 # create new column for 'allocated_bytes'
-df['allocated_bytes'] = int(args.blocksize) * df['allocated_blocks'].astype(int)
-#print(df)
+block_size = 1024
+blocks = df['allocated_blocks'] 
+df['allocated_bytes'] = 1024 * df['allocated_blocks'].astype(int)
+print(df)
 
 # create new column 'percent used'
 df['percent_used'] = df['used_bytes'] * 100 / df['allocated_bytes']
 
 print(df)
-print("Mean", round(df['percent_used'].mean(),2))
+print("Mean", df['percent_used'].mean())
 print("Max", df['percent_used'].max())
 print("Min", df['percent_used'].min())
 print("STD", df['percent_used'].std())
 
-ax = df[['percent_used']].plot.bar(title='Percent Utilization', xlabel='number of insertions', rot=45, ylim=[0,100])
+#ax = df[['percent_used']].plot.bar(title='Utilization Efficiency', xlabel='number of insertions', rot=45).legend(bbox_to_anchor=(1,1))
+ax = df[['percent_used']].plot.bar(title='Percent Utilization', xlabel='number of insertions', rot=45)
 
 # get the legend to not block important information
 plt.subplots_adjust(right=0.7)
 plt.tight_layout()
 
 # save the output file
-outname = "utilization-" + args.blocksize + ".png";
-plt.savefig(outname)
+plt.savefig("utilization.png")
 
 # pyplot likes to cache things it probably shouldn't
 plt.close('all')

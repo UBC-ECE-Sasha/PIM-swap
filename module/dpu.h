@@ -3,11 +3,15 @@
 
 #include <linux/types.h>
 
-//#define __DPU_MRAM_SIZE_LOG2 26
-#define __DPU_MRAM_SIZE_LOG2 25 
+#define __DPU_MRAM_SIZE_LOG2 26
 #define MRAM_PER_DPU (1 << __DPU_MRAM_SIZE_LOG2)
-#define __DPUS_PER_RANK_LOG2 6
+#define __DPUS_PER_RANK_LOG2 2
 #define DPUS_PER_RANK (1 << __DPUS_PER_RANK_LOG2)
+
+// MRAM size must be at least 8MB to do anything useful
+#if __DPU_MRAM_SIZE_LOG2 < 23
+	#error MRAM size is too small for any useful tests
+#endif
 
 #define DPU_ALLOCATE_ALL (U32_MAX)
 

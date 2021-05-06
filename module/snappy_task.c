@@ -2,7 +2,7 @@
 //JKN #include <defs.h>
 //JKN #include <perfcounter.h>
 //JKN #include <stdio.h>
-//JKN #include "alloc.h"
+#include "alloc_static.h"
 #include <linux/printk.h>
 #include "snappy_compress.h"
 #include "dpu.h"

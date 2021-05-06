@@ -22,9 +22,16 @@ enum {
 	COMMAND_LOAD
 };
 
+enum {
+	STATUS_OK,
+	STATUS_ERROR_STORE_NO_WRAM,
+	STATUS_ERROR_STORE_NO_SPACE
+};
+
 typedef struct page_descriptor {
 	uint8_t data[PAGE_SIZE];
 	uint32_t id;	// page identifier - high bit is used as 'page valid'
+	uint32_t status;
 } page_descriptor;
 
 static struct dpu_set_t dpus; // all allocated dpus
@@ -159,6 +166,7 @@ int lzo_compress_main(void)
 	uint8_t *in_page_w = NULL;
 	__mram_ptr uint8_t *out_page_m = NULL;
 	uint32_t id;
+	uint32_t status;
 
 	//printk("%s\n", __func__);
 
@@ -166,6 +174,8 @@ int lzo_compress_main(void)
 	mram_read(MRAM_VAR(trans_page) + PAGE_SIZE, &id, sizeof(uint32_t));
 	if (!(id & PAGE_VALID)) {
 		//printk("[%u] Ignoring invalid page\n", get_current_dpu());
+		status = STATUS_OK;
+		mram_write(&status, MRAM_VAR(trans_page) + PAGE_SIZE, sizeof(uint32_t));
 		return -1;
 	}
 	id &= ~PAGE_VALID; // remove valid flag
@@ -178,11 +188,15 @@ int lzo_compress_main(void)
 	out_page_w = mem_alloc(PAGE_SIZE);
 	if (!out_page_w) {
 		printk("error allocating output page in wram\n");
+		status = STATUS_ERROR_STORE_NO_WRAM;
+		mram_write(&status, MRAM_VAR(trans_page) + PAGE_SIZE, sizeof(uint32_t));
 		return -1;
 	}
 	in_page_w = mem_alloc(PAGE_SIZE);
 	if (!in_page_w) {
 		printk("error allocating input page in wram\n");
+		status = STATUS_ERROR_STORE_NO_WRAM;
+		mram_write(&status, MRAM_VAR(trans_page) + PAGE_SIZE, sizeof(uint32_t));
 		return -1;
 	}
 
@@ -203,11 +217,14 @@ int lzo_compress_main(void)
 		compressed_length = PAGE_SIZE;
 		out_page_w = in_page_w;
 	}
+
+	//printk("LZO: %u\n", compressed_length);
+
 #endif // USE_COMPRESSION
 
-	// don't store pages that are bigger than 3KB. It doesn't save any storage, and
-	// it would take time to decompress the results.
-	if (compressed_length >= KILOBYTE(3)) {
+	// don't store pages that are bigger than n-1, where n is the number of blocks needed to store a page.
+	// It doesn't save any storage, and it would take time to decompress the results.
+	if (compressed_length > (PAGE_SIZE - STORAGE_BLOCK_SIZE)) {
 		//printk("Compressed page is too big! (%u)\n", compressed_length);
 #ifdef STATISTICS
 		stats.uncompressable++;
@@ -221,6 +238,8 @@ int lzo_compress_main(void)
 
 	if (!out_page_m) {
 		printk("Can't allocate %u bytes\n", compressed_length);
+		status = STATUS_ERROR_STORE_NO_SPACE;
+		mram_write(&status, MRAM_VAR(trans_page) + PAGE_SIZE, sizeof(uint32_t));
 		return -1;
 	}
 	
@@ -234,6 +253,9 @@ int lzo_compress_main(void)
 #endif // USE_COMPRESSION
 
 	//printk("%s done\n", __func__);
+
+	status = STATUS_OK;
+	mram_write(&status, MRAM_VAR(trans_page) + PAGE_SIZE, sizeof(uint32_t));
 
 	return 0;
 }
@@ -279,7 +301,7 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
 	if (dpu_index != 0)
 		return -ENOSPC;
 
-	pr_err("store: offset=%lu\n", offset);
+	//pr_err("store: offset=%lu\n", offset);
 
 	dpu_rank = dpus;
 
@@ -303,7 +325,9 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
 		dpu_launch(dpu_rank, DPU_SYNCHRONOUS);
 		out_buffer_bmp = 0;
 
-		// clear out any pages that have been flushed (and their ids)
+		dpu_push_xfer(dpu_rank, DPU_XFER_FROM_DPU, trans_page, 0, sizeof(page_descriptor), DPU_XFER_DEFAULT);
+
+		// check return status
 		DPU_FOREACH(dpu_rank, dpu, dpu_id) {
 			out_buffer[dpu_id].id = 0;
 		}
@@ -354,7 +378,7 @@ static int pimswap_frontswap_load(unsigned type, pgoff_t offset,
 	if (dpu_index != 0)
 		return -ENOSPC;
 
-	pr_err("load: offset=%lu\n", offset);
+	//pr_err("load: offset=%lu\n", offset);
 	//printk("%s: offset: %lu dpu: %u rank: %u id: %u\n", __func__, offset, dpu_index, rank_index, page_id);
 
 	// select which rank to address
@@ -436,7 +460,7 @@ static void pimswap_frontswap_invalidate_page(unsigned type, pgoff_t offset)
 	//printk("Out buffer: 0x%llx\n", out_buffer_bmp);
 	//printk("id %u for dpu %u\n", out_buffer[dpu_index].id & ~PAGE_VALID, dpu_index);
 	if (out_buffer_bmp & (1ULL << dpu_index) && (out_buffer[dpu_index].id & ~PAGE_VALID) == ID_FROM_OFFSET(offset)) {
-		printk("invalidating page in out buffer\n");
+		//printk("invalidating page in out buffer\n");
 		out_buffer_bmp &= ~(1ULL << dpu_index);
 		return;
 	}
@@ -510,15 +534,21 @@ static int __init init_pim_swap(void)
 
 	frontswap_register_ops(&pimswap_frontswap_ops);
 
+	printk("DPUs per rank: %u\n", DPUS_PER_RANK);
+	printk("MRAM size: %d\n", MRAM_PER_DPU);
 	printk("MRAM layout:\n");
 	printk("0x%04lx - 0x%4lx: reserved\n", offsetof(struct mram_layout, reserved), offsetofend(struct mram_layout, reserved));
 	printk("0x%04lx - 0x%4lx: transfer page\n", offsetof(struct mram_layout, trans_page), offsetofend(struct mram_layout, trans_page));
 	printk("0x%04lx - 0x%4lx: directory\n", offsetof(struct mram_layout, directory), offsetof(struct mram_layout, directory) + DIRECTORY_SIZE);
 	printk("0x%04lx - 0x%4lx: storage\n", offsetof(struct mram_layout, storage), offsetof(struct mram_layout, storage) + STORAGE_SIZE);
 
+	printk("Total storage space: %d bytes\n", STORAGE_SIZE);
 	printk("Allocation table size: %lu\n", ALLOC_TABLE_SIZE);
-	printk("Total storage blocks: %d\n", NUM_STORAGE_BLOCKS);
 	printk("Storage block size: %d\n", STORAGE_BLOCK_SIZE);
+	printk("Total storage blocks: %d\n", NUM_STORAGE_BLOCKS);
+	printk("Number of L1 entries: %d\n", ALLOC_TABLE_L1_ENTRIES);
+	printk("Number of L2 entries: %d\n", ALLOC_TABLE_L2_ENTRIES);
+	printk("Number of L2 sections: %d\n", NUM_L2_SECTIONS);
 #ifdef DIRECTORY_HASH
 	printk("Using a hash table with %lu entries\n", NUM_HASH_ENTRIES);
 #endif // DIRECTORY_HASH

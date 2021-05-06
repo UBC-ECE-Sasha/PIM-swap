@@ -29,13 +29,18 @@
 # blocks = number of allocated blocks after the function completes
 # bytes = number of allocated bytes after the function completes
 
-output="utilization.csv"
+infile=$1
 
 # generate 'utilization efficiency' by comparing total available storage to
 # how much is allocated and how much of the allocated space is actually used
-block_size=$(awk '/Storage block size/ { print $4}' log.txt)
-num_blocks=$(awk '/Total storage blocks/ { print $4}' log.txt)
+block_size=$(awk '/Storage block size/ { print $4}' $infile)
+num_blocks=$(awk '/Total storage blocks/ { print $4}' $infile)
+
+output="utilization-$block_size.csv"
 
 echo "allocated_blocks,used_bytes" > $output
 # use 'awk' to output the CSV file directly
-awk '/STATS/ { print $7","$9 }' log.txt >> $output
+awk '/STATS/ { if ($7 > 0+max) max = $7; print $7","$9 } END { print "max blocks: " max}' $infile >> $output
+
+./graph-allocation.py -f $output -t $num_blocks -b $block_size
+./graph-utilization.py -f $output -b $block_size | tee util-$block_size.out

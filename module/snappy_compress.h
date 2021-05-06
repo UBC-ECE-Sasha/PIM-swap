@@ -55,23 +55,6 @@ typedef struct out_buffer_context
 	uint32_t length;			// Total size of output buffer in bytes
 } out_buffer_context;
 
-#ifndef PAGE_SIZE
-#define PAGE_SIZE 4096
-#endif
-
-#define RESERVED_SIZE MEGABYTE(1)
-#define DIRECTORY_SIZE (MEGABYTE(3) - KILOBYTE(4) - sizeof(unsigned int))
-#define STORAGE_SIZE MEGABYTE(60)
-
-// MRAM buffers
-MRAM_VARS_START
-uint8_t __mram_noinit reserved[RESERVED_SIZE];
-uint8_t __mram_noinit trans_page[PAGE_SIZE];
-uint32_t __mram_noinit id;
-uint8_t __mram_noinit directory[DIRECTORY_SIZE];
-uint8_t __mram_noinit storage[STORAGE_SIZE];
-MRAM_VARS_END
-
 /**
  * Perform the Snappy compression on the DPU.
  *
