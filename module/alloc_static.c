@@ -2,6 +2,8 @@
 #include "mram.h"
 #include "snappy_compress.h" // for mram layout
 #include "alloc_static.h"
+#include <linux/printk.h>
+#include <linux/kernel.h>
 
 #ifdef STATISTICS
 void print_statistics(void)
