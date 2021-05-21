@@ -1,5 +1,10 @@
 #!/bin/bash
 
+ENV_FILE="./.env"
+
+# Source env variables
+[ -f "${ENV_FILE}" ] && . "${ENV_FILE}"
+
 BUILDROOT_LOCATION=../buildroot
 OUTPUT_DIR=output
 
