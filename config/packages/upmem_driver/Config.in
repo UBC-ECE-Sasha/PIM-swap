@@ -1,0 +1,4 @@
+config BR2_PACKAGE_UPMEM_DRIVER
+        bool "upmem_driver"
+        help
+          UPMEM Driver
