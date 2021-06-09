@@ -3,5 +3,6 @@
 *.out
 *.txt
 *.qcow2
+/*.raw
 /output/
 /.env

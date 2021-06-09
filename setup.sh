@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Exit on error
+set -e
+
 ENV_FILE="./.env"
 
 # Source env variables
@@ -24,7 +27,6 @@ make -C $BUILDROOT_LOCATION qemu_pim_defconfig O=$PWD/$OUTPUT_DIR
 # override the location of the source for the pim_swap package
 cp config/local.mk $OUTPUT_DIR
 
-# create the virtual swap file
-if [[ ! -e swap-1g.qcow2 ]]; then
-	qemu-img create -f qcow2 swap-1g.qcow2 1G
+if [[ ! -e swap-1g.raw ]]; then
+	echo "create the virtual swap file with 'sudo ./swap_setup.sh'"
 fi

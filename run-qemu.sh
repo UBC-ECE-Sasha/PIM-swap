@@ -18,5 +18,14 @@ qemu-system-x86_64 -enable-kvm \
  -usb \
  -chardev pty,id=ser0 \
  -serial chardev:ser0 \
- -drive file=swap-1g.qcow2,format=qcow2,if=ide \
- -netdev tap,id=hostnet0,script=qemu-ifup -device e1000,netdev=hostnet0,mac=52:54:00:70:90:b0
+ -net user,hostfwd=tcp::10022-:22 -net nic \
+ -nographic \
+ -drive file=swap-1g.raw,format=raw,if=ide
+
+# For VNC: -vnc :1
+
+# user networking, forward host port to ssh quest port
+# Setup a basic virtual NIC
+
+# Bridge:
+# -netdev tap,id=hostnet0,script=qemu-ifup -device e1000,netdev=hostnet0,mac=52:54:00:70:90:b0
