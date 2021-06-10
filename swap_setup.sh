@@ -1,6 +1,11 @@
-#!/bin/sh
+#!/bin/bash
 
 set -e
+
+if [ ${EUID} != 0 ]; then
+    echo "'$0' must be run as root" 1>&2
+    exit 1
+fi
 
 SWAP_IMAGE="swap-1g.raw"
 
