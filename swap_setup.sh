@@ -18,7 +18,7 @@ chown $USER:$USER "${SWAP_IMAGE}"
 
 loop_dev=$(losetup -f)
 if [ -z "${loop_dev}" ]; then
-    echo "No free loop devices found, increase range or mkswap manually"
+    echo "No free loop devices found"
     exit 1
 fi
 
