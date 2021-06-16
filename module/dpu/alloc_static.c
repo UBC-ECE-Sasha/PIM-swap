@@ -1,4 +1,4 @@
-#include "dpu.h"
+#include "upmem/uapi/dpu.h"
 #include "mram.h"
 #include "snappy_compress.h" // for mram layout
 #include "alloc_static.h"
@@ -117,7 +117,7 @@ void pimswap_insert_index_hash(uint32_t id, __mram_ptr uint32_t block, uint32_t 
 	//printk("[%u] Storing id %u as tag: %u block %u length %u\n", get_current_dpu(), id, entry.tag, entry.block, entry.length);
 
 	// update the entry with the new values
-	//printk("[%u] writing entry %u to 0x%llx\n", get_current_dpu(), entry_index, (uint64_t)entry_addr); 
+	//printk("[%u] writing entry %u to 0x%llx\n", get_current_dpu(), entry_index, (uint64_t)entry_addr);
 	mram_write(&entry, entry_addr, DPU_ALIGN(sizeof(struct pim_hash_entry), 8));
 }
 
@@ -142,7 +142,7 @@ __mram_ptr uint8_t *pimswap_lookup_index_hash(unsigned int id, unsigned int *len
 		*length = entry.length;
 		//printk("Found tag: %u block %u length %u\n", entry.tag, entry.block, entry.length);
 		return MRAM_VAR(storage) + (entry.block << STORAGE_BLOCK_SIZE_LOG2);
-	} 
+	}
 
 	//printk("[%u] length %u wrong or tag %u doesn't match %u\n", get_current_dpu(), entry.length, entry.tag, TAG_FROM_ID(id));
 	*length = 0;

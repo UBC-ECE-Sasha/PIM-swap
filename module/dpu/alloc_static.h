@@ -1,7 +1,7 @@
 #ifndef _ALLOC_STATIC__H
 #define _ALLOC_STATIC__H
 
-#include "common.h"
+#include "../common.h"
 #include "dpu.h"
 
 #define STATISTICS
@@ -115,7 +115,7 @@ MRAM_VARS_END
 #define ALLOC_TABLE_L2_SIZE (sizeof_field(struct static_directory_btree, dir_level2))
 #define DIR_LEVEL1_OFFSET offsetof(struct static_directory_btree, dir_level1)
 #define DIR_LEVEL2_OFFSET offsetof(struct static_directory_btree, dir_level2)
-#define BTREE_L1_ENTRIES	16 
+#define BTREE_L1_ENTRIES	16
 #define BTREE_L2_ENTRIES 7680
 #define BTREE_NODE_SIZE (sizeof(struct btree_node))
 #define MAX_CHILDREN 16
