@@ -1,11 +1,18 @@
-#include "dpu.h"
-#include "mram.h"
+#include <mram.h>
 #include "alloc_static.h"
 #include "../common.h"
+#include <stdio.h>
+
+uint8_t __mram_noinit reserved[RESERVED_SIZE];
+uint8_t __mram_noinit trans_page[PAGE_SIZE];
+uint32_t __mram_noinit id;
+uint32_t __mram_noinit status;
+uint8_t __mram_noinit directory[DIRECTORY_SIZE];
+uint8_t __mram_noinit storage[STORAGE_SIZE];
 
 static __mram_ptr uint8_t *pimswap_lookup_index(unsigned int id, unsigned int *length)
 {
-	//printk("%s: id=%u\n", __func__, id);
+	//printf("%s: id=%u\n", __func__, id);
 
 	return pimswap_lookup_index_hash(id, length);
 }
@@ -20,49 +27,51 @@ int main(void)
 	__mram_ptr uint8_t *in_page_m = NULL;
 	uint32_t id;
 
-	//printk("%s\n", __func__);
+	//printf("%s\n", __func__);
 
 	// read page ID
-	mram_read(MRAM_VAR(trans_page) + PAGE_SIZE, &id, sizeof(uint32_t));
+	mram_read(trans_page + PAGE_SIZE, &id, DPU_ALIGN(sizeof(uint32_t), 8));
 
-	//printk("[%u] Looking for id %u\n", get_current_dpu(), id);
+	//printf("[%u] Looking for id %u\n", dpu_id, id);
 
 	// look up page location in MRAM
 	in_page_m = pimswap_lookup_index(id, &compressed_length);
 	if (!in_page_m) {
-		printk("Page %u not found in MRAM!\n", id);
+		printf("Page %u not found in MRAM!\n", id);
 		return -1;
 	}
 
 	out_page_w = mem_alloc(PAGE_SIZE);
 	if (!out_page_w) {
-		printk("ERROR: allocating output page in wram\n");
+		printf("ERROR: allocating output page in wram\n");
 		return -1;
 	}
 	in_page_w = mem_alloc(PAGE_SIZE);
 	if (!in_page_w) {
-		printk("ERROR: allocating input page in wram\n");
+		printf("ERROR: allocating input page in wram\n");
 		return -1;
 	}
 
-	//printk("Reading page from 0x%llx\n", (uint64_t)in_page_m);
+	//printf("Reading page from 0x%llx\n", (uint64_t)in_page_m);
 	if (compressed_length == PAGE_SIZE) {
 		// if it's not compressed, then we are done!
-		mram_read(in_page_m, out_page_w, compressed_length);
+		// TODO: JR: multiple reads, PAGE_SIZE too large
+		// mram_read(in_page_m, out_page_w, DPU_ALIGN(compressed_length, 8));
 	} else {
-		mram_read(in_page_m, in_page_w, compressed_length);
+		mram_read(in_page_m, in_page_w, DPU_ALIGN(compressed_length, 8));
 
 	//print_hex_dump(KERN_ERR, "before decompress (w): ", DUMP_PREFIX_ADDRESS,
 	 //   32, 1, in_page_w, 32, false);
 
-		ret = crypto_comp_decompress(tfm, in_page_w, compressed_length, out_page_w, &new_len);
+		// TODO: JR: Replace kernel function
+		ret = 0; // crypto_comp_decompress(tfm, in_page_w, compressed_length, out_page_w, &new_len);
 		if (ret != 0) {
-			printk("ERROR: Decompression failed\n");
+			printf("ERROR: Decompression failed\n");
 			return -1;
 		}
 
 		if (new_len != PAGE_SIZE) {
-			printk("ERROR: decompressed size is wrong\n");
+			printf("ERROR: decompressed size is wrong\n");
 			return -1;
 		}
 	}
@@ -71,7 +80,8 @@ int main(void)
 	 //   32, 1, out_page_w, 32, false);
 
 	// copy results to transfer page in MRAM
-	mram_write(out_page_w, MRAM_VAR(trans_page), PAGE_SIZE);
+	// TODO: JR: multiple writes, PAGE_SIZE too large
+	// mram_write(out_page_w, trans_page, PAGE_SIZE);
 
 	return 0;
 }

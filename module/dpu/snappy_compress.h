@@ -6,8 +6,9 @@
 #define _DPU_COMPRESS_H_
 
 //JKN #include "common.h"
-#include "dpu.h"
-#include "seqread.h"
+#include <seqread.h>
+#include <stdint.h>
+#include <stdio.h>
 
 #define NR_TASKLETS 1
 #define STACK_SIZE_DEFAULT 256

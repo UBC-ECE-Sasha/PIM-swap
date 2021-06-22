@@ -10,7 +10,6 @@
 #define DPU_INDEX_FROM_OFFSET(_offset) ((uint8_t)(_offset & ((1 << __DPUS_PER_RANK_LOG2) - 1)))
 #define ID_FROM_OFFSET(_offset) ((uint32_t)(_offset >> __DPUS_PER_RANK_LOG2) & 0x7FFFFFFF)
 #define RANK_INDEX_FROM_OFFSET(_offset) ((uint8_t)(_offset >> 24))
-#define PAGE_VALID 0x80000000
 
 // command to select the DPU function
 enum {

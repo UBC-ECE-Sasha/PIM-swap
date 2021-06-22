@@ -3,11 +3,11 @@
 //JKN #include <perfcounter.h>
 //JKN #include <stdio.h>
 #include "alloc_static.h"
-#include <linux/printk.h>
 #include "snappy_compress.h"
-#include "dpu.h"
+#include <stdio.h>
 
-#define printf printk
+// TODO, set from host
+__host uint32_t dpu_id;
 
 // WRAM variables
 __host uint32_t block_size;
@@ -37,7 +37,7 @@ int snappy_compress_main(void)
 
 	idx = me();
 	printf("DPU starting compress, tasklet %d\n", idx);
-	
+
 	// Check that this tasklet has work to run
 	if ((idx != 0) && (input_block_offset[idx] == 0)) {
 		printf("Tasklet %d has nothing to run\n", idx);
@@ -51,20 +51,20 @@ int snappy_compress_main(void)
 
 	// Prepare the input and output descriptors
 	input_start = (input_block_offset[idx] - input_block_offset[0]) * block_size;
-	printk("input start: %u\n", input_start);
+	printf("input start: %u\n", input_start);
 	output_start = alloc_storage_dynamic(4096);
 	//output_start = output_offset[idx] - output_offset[0];
 
-	printk("in_page: 0x%llx\n", (uint64_t)MRAM_VAR(trans_page));
-	input.buffer = (uint8_t*)(MRAM_VAR(trans_page) + input_start);
-	printk("input.buffer: %p\n", input.buffer);
+	printf("in_page: 0x%llx\n", (uint64_t)trans_page);
+	input.buffer = (uint8_t*)(trans_page) + input_start);
+	printf("input.buffer: %p\n", input.buffer);
 	input.cache = seqread_alloc();
 	input.ptr = seqread_init(input.cache, input.buffer, &input.sr);
 	input.curr = 0;
 	input.length = 0;
 
 		print_hex_dump(KERN_ERR, "in_page: ", DUMP_PREFIX_ADDRESS,
-		    16, 1, get_dpu(get_current_dpu())->mram + (uintptr_t)input.buffer, 32, true);
+		    16, 1, get_dpu(dpu_id)->mram + (uintptr_t)input.buffer, 32, true);
 
 	output.buffer = (uint8_t*)(MRAM_VAR(storage) + output_start);
 	output.append_ptr = (uint8_t*)DPU_ALIGN(mem_alloc(OUT_BUFFER_LENGTH), 8);
@@ -90,7 +90,7 @@ int snappy_compress_main(void)
 		input.length = input_length - input_start;
 	}
 
-	printk("Input length: %u\n", input.length);
+	printf("Input length: %u\n", input.length);
 
 	if (input.length != 0) {
 		//if (dpu_compress(&input, &output, block_size))

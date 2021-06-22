@@ -1,16 +1,22 @@
 #ifndef __COMMON_H
 #define __COMMON_H
 
+#ifndef ON_DPU
 #include <linux/types.h>
+#endif
 
 /* Everything in this file can be used on the host or the DPU */
 
+#define PAGE_VALID 0x80000000
+
+#ifndef ON_DPU // JR: Remove these JKN?
 /* JKN: added a bunch of stuff for compilation in a linux kernel module */
 typedef unsigned long uintptr_t;
 #define __mram_ptr
 #define __host
 #define __dma_aligned
 #define __mram_noinit
+#endif
 
 /* To suppress compiler warnings on unused parameters */
 #define UNUSED(_x) (_x=_x)
@@ -33,7 +39,7 @@ bottom 12 bits (0xFFF) use: BITMASK(12) */
 #define MRAM_SIZE MEGABYTE(64)
 
 /* If you have a value that needs alignment to the nearest _width. For example,
-0xF283 needs aligning to the next largest multiple of 16: 
+0xF283 needs aligning to the next largest multiple of 16:
 ALIGN(0xF283, 16) will return 0xF290 */
 #define DPU_ALIGN(_p, _width) (((unsigned long)_p + (_width-1)) & (0-_width))
 
@@ -45,7 +51,11 @@ WINDOW_ALIGN(0xF283, 1024) will return 0xF000 */
 
 /* Will only print messages (to stdout) when DEBUG is defined */
 #ifdef DEBUG
+#ifdef ON_DPU
+#define dbg_printf(M, ...) printf("%s: " M , __func__, ##__VA_ARGS__)
+#else
 #define dbg_printf(M, ...) printk("%s: " M , __func__, ##__VA_ARGS__)
+#endif
 #else
 #define dbg_printf(...)
 #endif

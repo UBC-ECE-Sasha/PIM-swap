@@ -2,7 +2,9 @@
 #define _ALLOC_STATIC__H
 
 #include "../common.h"
-#include "dpu.h"
+#include <mram.h>
+#include <defs.h>
+#include <stdint.h>
 
 #define STATISTICS
 #define DIRECTORY_HASH
@@ -60,7 +62,7 @@ maximum number of nodes = 28^(h+1)-1 = 262144 !Cannot fit!
 
 #define RESERVED_SIZE MEGABYTE(1)
 #define DIRECTORY_SIZE (MEGABYTE(3) - KILOBYTE(4) - sizeof(unsigned int))
-#define STORAGE_SIZE (MRAM_PER_DPU - MEGABYTE(4))
+#define STORAGE_SIZE (MRAM_SIZE - MEGABYTE(4))
 
 #define ALLOC_TABLE_L1_ENTRIES (ALLOC_TABLE_L2_ENTRIES >> (6 + 3)) //15
 #define ALLOC_TABLE_L2_ENTRIES (NUM_STORAGE_BLOCKS >> L2_BITS_PER_ENTRY_LOG2) //7680
@@ -93,26 +95,25 @@ maximum number of nodes = 28^(h+1)-1 = 262144 !Cannot fit!
 #define L2_ENTRY_FROM_BLOCK(_b) ((_b >> L2_BITS_PER_ENTRY_LOG2) & (ALLOC_TABLE_L2_ENTRIES_PER_SECTION-1))
 #define L2_BIT_FROM_BLOCK(_b) (_b & (L2_BITS_PER_ENTRY-1))
 
-#define STORAGE_BLOCK_FROM_ADDRESS(_address) (((uint64_t)_address - (uint64_t)MRAM_VAR(storage)) >> STORAGE_BLOCK_SIZE_LOG2)
+#define STORAGE_BLOCK_FROM_ADDRESS(_address) (((uint64_t)_address - (uint64_t)storage) >> STORAGE_BLOCK_SIZE_LOG2)
 #define TAG_FROM_ID(_x) (_x & 0xFFFF)
 
-#define HASH_ADDR_FROM_ENTRY(_entry) ((uint8_t*)MRAM_VAR(directory) + offsetof(struct static_directory_hash, hash_table) + _entry * sizeof(struct pim_hash_entry))
+// JR: Adding (__mram_ptr uint8_t*)directory is correct?
+#define HASH_ADDR_FROM_ENTRY(_entry) ((__mram_ptr uint8_t*)directory + offsetof(struct static_directory_hash, hash_table) + _entry * sizeof(struct pim_hash_entry))
 
 // MRAM buffers
-MRAM_VARS_START
-uint8_t __mram_noinit reserved[RESERVED_SIZE];
-uint8_t __mram_noinit trans_page[PAGE_SIZE];
-uint32_t __mram_noinit id;
-uint32_t __mram_noinit status;
-uint8_t __mram_noinit directory[DIRECTORY_SIZE];
-uint8_t __mram_noinit storage[STORAGE_SIZE];
-MRAM_VARS_END
+extern uint8_t __mram_noinit reserved[RESERVED_SIZE];
+extern uint8_t __mram_noinit trans_page[PAGE_SIZE];
+extern uint32_t __mram_noinit id;
+extern uint32_t __mram_noinit status;
+extern uint8_t __mram_noinit directory[DIRECTORY_SIZE];
+extern uint8_t __mram_noinit storage[STORAGE_SIZE];
 
 /***************/
 #ifdef DIRECTORY_BTREE
 
-#define ALLOC_TABLE_L1_SIZE (sizeof_field(struct static_directory_btree, dir_level1))
-#define ALLOC_TABLE_L2_SIZE (sizeof_field(struct static_directory_btree, dir_level2))
+#define ALLOC_TABLE_L1_SIZE DPU_ALIGN(ALLOC_TABLE_L1_ENTRIES, 8)
+#define ALLOC_TABLE_L2_SIZE DPU_ALIGN(ALLOC_TABLE_L2_ENTRIES, 8)
 #define DIR_LEVEL1_OFFSET offsetof(struct static_directory_btree, dir_level1)
 #define DIR_LEVEL2_OFFSET offsetof(struct static_directory_btree, dir_level2)
 #define BTREE_L1_ENTRIES	16
@@ -136,8 +137,8 @@ struct static_directory_btree {
 
 #elif defined DIRECTORY_HASH
 
-#define ALLOC_TABLE_L1_SIZE (sizeof_field(struct static_directory_hash, dir_level1))
-#define ALLOC_TABLE_L2_SIZE (sizeof_field(struct static_directory_hash, dir_level2))
+#define ALLOC_TABLE_L1_SIZE DPU_ALIGN(ALLOC_TABLE_L1_ENTRIES, 8)
+#define ALLOC_TABLE_L2_SIZE DPU_ALIGN(ALLOC_TABLE_L2_ENTRIES, 8)
 #define DIR_LEVEL1_OFFSET offsetof(struct static_directory_hash, dir_level1)
 #define DIR_LEVEL2_OFFSET offsetof(struct static_directory_hash, dir_level2)
 #define HASH_ENTRY_SIZE (sizeof(struct pim_hash_entry))
@@ -177,7 +178,7 @@ void pimswap_free_page_static(unsigned int id);
 #ifdef DIRECTORY_BTREE
 void pimswap_insert_index_btree(uint32_t id, __mram_ptr uint8_t *addr, uint32_t length);
 #elif defined DIRECTORY_HASH
-void pimswap_insert_index_hash(uint32_t id, __mram_ptr uint32_t block, uint32_t length);
+void pimswap_insert_index_hash(uint32_t id, uint32_t block, uint32_t length);
 __mram_ptr uint8_t *pimswap_lookup_index_hash(unsigned int id, unsigned int *length);
 #endif // DIRECTORY
 
