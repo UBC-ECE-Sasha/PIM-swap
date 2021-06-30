@@ -6,7 +6,6 @@
 // TODO, set from host
 __host uint32_t dpu_id;
 
-uint8_t __mram_noinit reserved[RESERVED_SIZE];
 uint8_t __mram_noinit trans_page[PAGE_SIZE];
 uint32_t __mram_noinit id;
 uint32_t __mram_noinit status;

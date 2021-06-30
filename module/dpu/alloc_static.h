@@ -61,7 +61,7 @@ maximum number of nodes = 28^(h+1)-1 = 262144 !Cannot fit!
 #endif
 
 #define RESERVED_SIZE MEGABYTE(1)
-#define DIRECTORY_SIZE (MEGABYTE(3) - KILOBYTE(4) - sizeof(unsigned int))
+#define DIRECTORY_SIZE (MEGABYTE(3) - KILOBYTE(4) - sizeof(unsigned int) - 16)
 #define STORAGE_SIZE (MRAM_SIZE - MEGABYTE(4))
 
 #define ALLOC_TABLE_L1_ENTRIES (ALLOC_TABLE_L2_ENTRIES >> (6 + 3)) //15
@@ -102,7 +102,6 @@ maximum number of nodes = 28^(h+1)-1 = 262144 !Cannot fit!
 #define HASH_ADDR_FROM_ENTRY(_entry) ((__mram_ptr uint8_t*)directory + offsetof(struct static_directory_hash, hash_table) + _entry * sizeof(struct pim_hash_entry))
 
 // MRAM buffers
-extern uint8_t __mram_noinit reserved[RESERVED_SIZE];
 extern uint8_t __mram_noinit trans_page[PAGE_SIZE];
 extern uint32_t __mram_noinit id;
 extern uint32_t __mram_noinit status;

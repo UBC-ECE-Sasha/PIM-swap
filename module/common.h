@@ -9,17 +9,10 @@
 
 #define PAGE_VALID 0x80000000
 
-#ifndef ON_DPU // JR: Remove these JKN?
-/* JKN: added a bunch of stuff for compilation in a linux kernel module */
-typedef unsigned long uintptr_t;
-#define __mram_ptr
-#define __host
-#define __dma_aligned
-#define __mram_noinit
-#endif
+#define MAX_MRAM_RW 2048
 
 /* To suppress compiler warnings on unused parameters */
-#define UNUSED(_x) (_x=_x)
+#define UNUSED(_x) (_x = _x)
 
 /* To mask out a certain number of bits from a value. For example, to mask the
 bottom 12 bits (0xFFF) use: BITMASK(12) */
@@ -41,24 +34,23 @@ bottom 12 bits (0xFFF) use: BITMASK(12) */
 /* If you have a value that needs alignment to the nearest _width. For example,
 0xF283 needs aligning to the next largest multiple of 16:
 ALIGN(0xF283, 16) will return 0xF290 */
-#define DPU_ALIGN(_p, _width) (((unsigned long)_p + (_width-1)) & (0-_width))
+#define DPU_ALIGN(_p, _width) (((unsigned long)_p + (_width - 1)) & (0 - _width))
 
 /* If you need to know an aligned window that contains a given address. For
 example, what is the starting address of the 1KB block that contains the address
 0xF283?
 WINDOW_ALIGN(0xF283, 1024) will return 0xF000 */
-#define WINDOW_ALIGN(_p, _width) (((unsigned long)_p) & (0-_width))
+#define WINDOW_ALIGN(_p, _width) (((unsigned long)_p) & (0 - _width))
 
 /* Will only print messages (to stdout) when DEBUG is defined */
 #ifdef DEBUG
 #ifdef ON_DPU
-#define dbg_printf(M, ...) printf("%s: " M , __func__, ##__VA_ARGS__)
+#define dbg_printf(M, ...) printf("%s: " M, __func__, ##__VA_ARGS__)
 #else
-#define dbg_printf(M, ...) printk("%s: " M , __func__, ##__VA_ARGS__)
+#define dbg_printf(M, ...) printk("%s: " M, __func__, ##__VA_ARGS__)
 #endif
 #else
 #define dbg_printf(...)
 #endif
 
-#endif	/* __COMMON_H */
-
+#endif /* __COMMON_H */

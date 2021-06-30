@@ -7,7 +7,6 @@
 #define STATUS_ERROR_STORE_NO_WRAM 1
 #define STATUS_ERROR_STORE_NO_SPACE 2
 
-uint8_t __mram_noinit reserved[RESERVED_SIZE];
 uint8_t __mram_noinit trans_page[PAGE_SIZE];
 uint32_t __mram_noinit id;
 uint32_t __mram_noinit status;
