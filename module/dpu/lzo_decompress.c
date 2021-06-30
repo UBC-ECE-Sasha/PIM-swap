@@ -54,8 +54,16 @@ int main(void)
 	//printf("Reading page from 0x%llx\n", (uint64_t)in_page_m);
 	if (compressed_length == PAGE_SIZE) {
 		// if it's not compressed, then we are done!
-		// TODO: JR: multiple reads, PAGE_SIZE too large
-		// mram_read(in_page_m, out_page_w, DPU_ALIGN(compressed_length, 8));
+        uint32_t remaining = compressed_length;
+        uint8_t *out_page_w_loc = out_page_w;
+        uint8_t __mram_ptr *in_page_m_loc = in_page_m;
+        while (remaining > 0) {
+            size_t read_sz = DPU_ALIGN(remaining > MAX_MRAM_RW ? MAX_MRAM_RW : remaining, 8);
+            mram_read(in_page_m_loc, out_page_w_loc, read_sz);
+            out_page_w_loc += read_sz;
+            in_page_m_loc += read_sz;
+            remaining -= MAX_MRAM_RW;
+    }
 	} else {
 		mram_read(in_page_m, in_page_w, DPU_ALIGN(compressed_length, 8));
 
@@ -81,6 +89,16 @@ int main(void)
 	// copy results to transfer page in MRAM
 	// TODO: JR: multiple writes, PAGE_SIZE too large
 	// mram_write(out_page_w, trans_page, PAGE_SIZE);
+    uint8_t remaining = PAGE_SIZE;
+    uint8_t *out_page_w_loc = out_page_w;
+    uint8_t __mram_ptr *trans_page_loc = trans_page;
+    while (remaining > 0) {
+        size_t write_sz = DPU_ALIGN(remaining > MAX_MRAM_RW ? MAX_MRAM_RW : remaining, 8);
+        mram_write(out_page_w_loc, trans_page_loc, write_sz);
+        out_page_w_loc += write_sz;
+        trans_page_loc += write_sz;
+        remaining -= MAX_MRAM_RW;
+    }
 
 	return 0;
 }

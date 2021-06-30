@@ -70,8 +70,16 @@ int main(void)
 	}
 
 	// copy the page from MRAM to WRAM
-	// TODO: JR: multiple reads, PAGE_SIZE too large
-	// mram_read(trans_page, in_page_w, PAGE_SIZE);
+    uint32_t remaining = PAGE_SIZE;
+    uint8_t *in_page_w_loc = in_page_w;
+    uint8_t __mram_ptr *trans_page_loc = trans_page;
+    while (remaining > 0) {
+        size_t read_sz = DPU_ALIGN(remaining > MAX_MRAM_RW ? MAX_MRAM_RW : remaining, 8);
+        mram_read(trans_page_loc, in_page_w_loc, read_sz);
+        in_page_w_loc += read_sz;
+        trans_page_loc += read_sz;
+        remaining -= MAX_MRAM_RW;
+    }
 
 	//in_page_m = dpu_id->mram + in_page;
 
@@ -116,8 +124,17 @@ int main(void)
 	}
 
 	// copy the page from WRAM to its new location in MRAM
-	// TODO: JR: multiple writes, PAGE_SIZE too large
-	// mram_write(out_page_w, out_page_m, DPU_ALIGN(compressed_length, 8));
+    remaining = compressed_length;
+    uint8_t *out_page_w_loc = out_page_w;
+    uint8_t __mram_ptr *out_page_m_loc = out_page_m;
+    while (remaining > 0) {
+        size_t write_sz = DPU_ALIGN(remaining > MAX_MRAM_RW ? MAX_MRAM_RW : remaining, 8);
+        mram_write(out_page_w_loc, out_page_m_loc, write_sz);
+        out_page_w_loc += write_sz;
+        out_page_m_loc += write_sz;
+        remaining -= MAX_MRAM_RW;
+    }
+
 
 #ifdef USE_COMPRESSION
 	//printf("Writing page to 0x%llx (length 0x%x)\n", (uint64_t)out_page_m, compressed_length);
