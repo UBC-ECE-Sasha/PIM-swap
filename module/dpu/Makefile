@@ -17,11 +17,14 @@ DECOMPRESS_DPU = decompress.dpu
 COMPRESS_SOURCES = lzo_compress.c alloc_static.c
 COMPRESS_DPU = compress.dpu
 
+TEST_SOURCES = test.c
+TEST_DPU = test.dpu
+
 .PHONY: default all clean
 
 default: all
 
-all: $(INVALIDATE_DPU) $(DECOMPRESS_DPU) $(COMPRESS_DPU)
+all: $(INVALIDATE_DPU) $(DECOMPRESS_DPU) $(COMPRESS_DPU) $(TEST_DPU)
 
 clean:
 	$(RM) *.dpu
@@ -33,4 +36,7 @@ $(DECOMPRESS_DPU): $(DECOMPRESS_SOURCES)
 	$(CC) $(CFLAGS) $^ -o $@
 
 $(COMPRESS_DPU): $(COMPRESS_SOURCES)
+	$(CC) $(CFLAGS) $^ -o $@
+
+$(TEST_DPU): $(TEST_SOURCES)
 	$(CC) $(CFLAGS) $^ -o $@
