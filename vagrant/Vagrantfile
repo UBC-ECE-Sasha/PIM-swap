@@ -1,11 +1,18 @@
 ################################################################################
 #
 # Vagrantfile
+# Adapted from https://buildroot.org/downloads/Vagrantfile
+# Author: Jackson Dagger
+# Email: JacksonDDagger@gmail.com
+# Date: July 26, 2021
 #
+# This Vagrantfile is for building PIM-swap on a virtualbox VM. The wiki for
+# PIM-swap can be found at https://wiki.ubc.ca/PIM-SWAP? and the repo at
+# https://github.com/UBC-ECE-Sasha/PIM-swap
 ################################################################################
 
 # Buildroot version to use
-RELEASE='2021.02.2'
+BR_RELEASE='2021.02.2'
 
 ### Change here for more memory/cores ###
 VM_MEMORY=4096
@@ -35,16 +42,17 @@ Vagrant.configure('2') do |config|
 		s.inline = 'echo Setting up machine name'
 
 		config.vm.provider :vmware_fusion do |v, override|
-			v.vmx['displayname'] = "Buildroot #{RELEASE}"
+			v.vmx['displayname'] = "PIM-swap build"
 		end
 
 		config.vm.provider :virtualbox do |v, override|
-			v.name = "Buildroot #{RELEASE}"
+			v.name = "PIM-swap build"
 		end
 	end
 
 	config.vm.provision 'shell', privileged: true, inline:
-		"sed -i 's|deb http://us.archive.ubuntu.com/ubuntu/|deb mirror://mirrors.ubuntu.com/mirrors.txt|g' /etc/apt/sources.list
+		"
+		sed -i 's|deb http://us.archive.ubuntu.com/ubuntu/|deb mirror://mirrors.ubuntu.com/mirrors.txt|g' /etc/apt/sources.list
 		dpkg --add-architecture i386
 		apt-get -q update
 		apt-get purge -q -y snapd lxcfs lxd ubuntu-core-launcher snap-confine
@@ -54,19 +62,25 @@ Vagrant.configure('2') do |config|
 			dh-autoconf
 		apt-get -q -y autoremove
 		apt-get -q -y clean
-		update-locale LC_ALL=C"
+		update-locale LC_ALL=C
+		"
 
 	config.vm.provision 'shell', privileged: false, inline:
-		"echo 'Downloading and extracting buildroot #{RELEASE}'
-		wget -q -c http://buildroot.org/downloads/buildroot-#{RELEASE}.tar.gz
-		tar axf buildroot-#{RELEASE}.tar.gz
-		mv buildroot-#{RELEASE} buildroot"
+		"
+		echo 'Downloading and extracting buildroot #{BR_RELEASE}'
+		wget -q -c http://buildroot.org/downloads/buildroot-#{BR_RELEASE}.tar.gz
+		tar axf buildroot-#{BR_RELEASE}.tar.gz
+		mv buildroot-#{BR_RELEASE} src/buildroot
+		"
 	config.vm.provision 'shell', privileged: false, inline:
-		"echo 'Downloading and extracting PIM-swap HEAD'
-		git clone https://github.com/UBC-ECE-Sasha/PIM-swap PIM-swap"
+		"
+		echo 'Downloading and extracting PIM-swap HEAD'
+		git clone https://github.com/UBC-ECE-Sasha/PIM-swap src/PIM-swap
+		"
 	config.vm.provision 'shell', privileged: false, inline:
-		"echo '#!/bin/sh' >> PIM-swap/.env
-		echo 'export PIMSWAP_SITE=/home/vagrant/PIM-swap' >> PIM-swap/.env
-		echo 'export PIMSWAP_OVERRIDE_SRCDIR=/home/vagrant/PIM-swap/module' >> PIM-swap/.env
+		"
+		echo '#!/bin/sh' >> src/PIM-swap/.env
+		echo 'export PIMSWAP_SITE=/home/vagrant/PIM-swap' >> src/PIM-swap/.env
+		echo 'export PIMSWAP_OVERRIDE_SRCDIR=/home/vagrant/PIM-swap/module' >> src/PIM-swap/.env
 		"
 end
