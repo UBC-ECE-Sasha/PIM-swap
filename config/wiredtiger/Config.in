@@ -1,0 +1,6 @@
+config BR2_PACKAGE_WIREDTIGER
+        bool "wiredtiger"
+        help
+          wiredtiger storage engine
+
+          http://source.wiredtiger.com/

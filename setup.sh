@@ -20,6 +20,7 @@ cp -R config/pimswap $BUILDROOT_LOCATION/package
 cp -R config/linux_config $BUILDROOT_LOCATION
 cp -R config/rootfs_overlay $BUILDROOT_LOCATION
 cp -R config/upmem $BUILDROOT_LOCATION/board
+cp -R config/wiredtiger $BUILDROOT_LOCATION/package
 
 # set up the buildroot output directory
 make -C $BUILDROOT_LOCATION qemu_pim_defconfig O=$PWD/$OUTPUT_DIR
