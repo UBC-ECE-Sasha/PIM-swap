@@ -3,6 +3,9 @@
 *.out
 *.txt
 *.qcow2
+*.err
+*.log
 /*.raw
 /output/
 /.env
+/bench/log/
