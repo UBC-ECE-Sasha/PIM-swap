@@ -1,5 +1,7 @@
 #!/bin/bash
 
+IMAGE_SIZE=${1:-1} # set to default of 1GB if not passed in command line
+
 set -e
 
 if [ ${EUID} != 0 ]; then
@@ -7,10 +9,10 @@ if [ ${EUID} != 0 ]; then
     exit 1
 fi
 
-SWAP_IMAGE="swap-1g.raw"
+SWAP_IMAGE="swap-${IMAGE_SIZE}g.raw"
 
 # Create swap image
-qemu-img create -f raw "${SWAP_IMAGE}" 1G
+qemu-img create -f raw "${SWAP_IMAGE}" ${IMAGE_SIZE}G
 
 # image must be o=rw- on UPMEM servers
 chmod 666 "${SWAP_IMAGE}"
