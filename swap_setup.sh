@@ -2,6 +2,8 @@
 
 IMAGE_SIZE=${1:-1} # set to default of 1GB if not passed in command line
 
+IMAGE_SIZE=${1:-1} # set to default of 1GB if not passed in command line
+
 set -e
 
 if [ ${EUID} != 0 ]; then
