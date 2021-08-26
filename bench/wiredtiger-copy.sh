@@ -4,8 +4,6 @@
 #
 # Copy built wiredtiger executables over to QEMU guest
 
-cd ../../
-
 WT_DIR="wiredtiger"
 WTPERF_PATH="$WT_DIR/build_posix/bench/wtperf/wtperf"
 
@@ -30,7 +28,7 @@ else
     cd ../../
 fi
 
-cp -a PIM-swap/bench/test-configs/wtperf/. wiredtiger/bench/wtperf/runners
+cp -a test-configs/wtperf/. wiredtiger/bench/wtperf/runners
 
 # create directory structure
 sshpass -p "root" ssh root@localhost -p 10022 -o "UserKnownHostsFile /dev/null" -o StrictHostKeyChecking=no 'mkdir wiredtiger && mkdir wiredtiger/build_posix'
