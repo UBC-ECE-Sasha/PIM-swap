@@ -11,7 +11,8 @@ mv wiredtiger /media/wiredtiger # move to larger shared drive
 cd /media/wiredtiger/build_posix/bench/wtperf
 ./wtperf -O ../../../bench/wtperf/runners/ycsb-c4.wtperf
 
-echo MONITOR
+echo MONITOR CSV
 cat WT_TEST/monitor
+echo CSV DONE
 
 poweroff -f

@@ -8,5 +8,6 @@
 /*.raw
 /output/
 /.env
-/bench/log/
+/bench/logs/
+/bench/csvs/
 /bench/wiredtiger/

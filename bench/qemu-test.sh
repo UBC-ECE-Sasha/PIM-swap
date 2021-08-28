@@ -14,8 +14,8 @@ EXTRA_DRIVE="${5:-/media/jackson/WDC_HDD/disk_imgs/disk_120G.raw}" # other hard 
 TIMEOUT="${6:-0}" # in seconds
 
 TEST_PROGRAM=(${GUEST_SH//_/ })
-LOG_PREFIX="${TEST_PROGRAM[0]}_"
-LOG_DIR="log"
+LOG_PREFIX="${TEST_PROGRAM[0]}_${QEMU_MEM}MB_"
+LOG_DIR="logs"
 
 STDOUT_LOG_SUFFIX=".log"
 STDOUT_LOG_NAME="$LOG_DIR/$LOG_PREFIX$(date '+%Y-%m-%d--%H-%M-%S')$STDOUT_LOG_SUFFIX"
@@ -51,5 +51,7 @@ bash $HOST_SH && \
   -o "UserKnownHostsFile /dev/null" \
   -o StrictHostKeyChecking=no) \
 >> $STDOUT_LOG_NAME 2> $STDERR_LOG_NAME &
+
+sed -i 's/(uS)read/(uS),read/g' $STDOUT_LOG_NAME
 
 wait
