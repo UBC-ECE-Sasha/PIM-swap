@@ -40,7 +40,7 @@ timeout $TIMEOUT qemu-system-x86_64 -enable-kvm \
  -serial chardev:ser0 \
  -net user,hostfwd=tcp::10022-:22 -net nic \
  -drive file=../swap-10g.raw,format=raw,if=ide \
- -drive file=$EXTRA_DRIVE,format=raw,if=ide &
+ -drive file=$EXTRA_DRIVE,format=raw,if=ide & # TODO: allow for no extra drive
 
 # wait for QEMU to start, run script on host, ssh and run guest script.
 # TODO, wait on QEMU monitor (if possible) instead of sleeping
@@ -52,6 +52,7 @@ bash $HOST_SH && \
   -o StrictHostKeyChecking=no) \
 >> $STDOUT_LOG_NAME 2> $STDERR_LOG_NAME &
 
-sed -i 's/(uS)read/(uS),read/g' $STDOUT_LOG_NAME
-
 wait
+
+# there's a typo in wt monitor files
+sed -i 's/(uS)read/(uS),read/g' $STDOUT_LOG_NAME

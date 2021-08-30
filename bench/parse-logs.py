@@ -76,12 +76,16 @@ for fileName in logList:
 
     if os.path.isfile(os.path.join(csvDirectory, csvFileName)):
         dfMonitor = pd.read_csv(os.path.join(csvDirectory, csvFileName), index_col=False)
-        #print(fileName + " len: " + str(len(dfMonitor["totalsec"])))
-        #print(dfMonitor.head())
+        dfMonitor["insert average latency(uS)"] = pd.to_numeric(dfMonitor["insert average latency(uS)"].str.slice(start=1))
+
         elapsed = dfMonitor["totalsec"].iloc[-1] # get elapsed time
+        mean_insert_ps = dfMonitor["insert ops per second"].mean()
+        mean_insert_latency = dfMonitor["insert average latency(uS)"].mean()
     else:
-        elapsed = 0
         dfMonitor = pd.DataFrame()
+        elapsed = 0
+        mean_insert_ps = 0
+        mean_insert_latency = 0
 
     fileNameParts = re.split("[_ .]", fileName)
     startDatetime = datetime.strptime(fileNameParts[-2], datetimeFormat)
@@ -90,7 +94,9 @@ for fileName in logList:
         "datetime": startDatetime,
         "config": testConfig,
         "memory (MB)": memory,
-        "elapsed (s)": elapsed
+        "elapsed (s)": elapsed,
+        "mean insert ops /s": mean_insert_ps,
+        "mean insert latency (mcs)": mean_insert_latency
     }
     rowsList.append(rowDict)
 
@@ -98,5 +104,7 @@ for fileName in logList:
 
 dfTests = pd.DataFrame(rowsList)
 csvTestsName = "all_tests_" + datetime.now().strftime(datetimeFormat) + ".csv"
+
+dfTests = dfTests.sort_values("datetime")
 
 dfTests.to_csv(path_or_buf = os.path.join(csvDirectory, csvTestsName))
