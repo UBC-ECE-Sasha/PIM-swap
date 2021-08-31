@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 #
 # 2020-02-10 J.Nider
 #

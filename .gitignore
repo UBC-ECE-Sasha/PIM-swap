@@ -3,6 +3,11 @@
 *.out
 *.txt
 *.qcow2
+*.err
+*.log
 /*.raw
 /output/
 /.env
+/bench/logs/
+/bench/csvs/
+/bench/wiredtiger/
