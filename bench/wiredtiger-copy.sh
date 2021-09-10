@@ -2,7 +2,9 @@
 #
 # 2021-08-11 J. Dagger
 #
-# Copy built wiredtiger executables over to QEMU guest
+# Copy built wiredtiger executables over to running QEMU guest
+# Will fail if QEMU guest isn't running or blocks connections
+# Assumes SSH port of 10022
 
 WT_DIR="wiredtiger"
 WTPERF_PATH="$WT_DIR/build_posix/bench/wtperf/wtperf"

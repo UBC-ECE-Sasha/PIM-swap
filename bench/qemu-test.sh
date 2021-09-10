@@ -5,6 +5,7 @@
 # Runs the QEMU guest with the ability to pass scripts to be run
 # locally and on the guest as parameters.
 # 
+# Port 10022 must be free for ssh meaning multiple instances of this script cannot be run concurrently
 
 ROOT=buildroot
 TERMINAL="gnome-terminal"
@@ -16,7 +17,7 @@ QEMU_MEM="${3:-4096}" # memory in MB of QEMU guest
 CORES="${4:-1}" # number of cores to emulate
 EXTRA_DRIVE="${5:-none}" # other hard drive to add. TODO: once dev is complete, setup default so that it's not necessary
 TIMEOUT="${6:-0}" # in seconds
-KILL_AFTER="${7:-true}"
+KILL_AFTER="${7:-true}" # whether or not to kill machine after running GUEST_SH. Does nothing if GUEST_SH is 'none'
 
 # logs are named based on the program being tested, memory allocated and datetime
 TEST_PROGRAM=(${GUEST_SH//_/ })
