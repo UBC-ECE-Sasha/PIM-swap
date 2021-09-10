@@ -14,5 +14,3 @@ cd /media/wiredtiger/build_posix/bench/wtperf
 echo MONITOR CSV
 cat WT_TEST/monitor
 echo CSV DONE
-
-poweroff -f
