@@ -10,17 +10,56 @@
 ROOT=buildroot
 TERMINAL="gnome-terminal"
 
-# command line arguments to script with defaults
-HOST_SH="${1:-none}" # file to run on host
-GUEST_SH="${2:-none}" # file to run on guest
-QEMU_MEM="${3:-4096}" # memory in MB of QEMU guest
-CORES="${4:-1}" # number of cores to emulate
-EXTRA_DRIVE="${5:-none}" # other hard drive to add. TODO: once dev is complete, setup default so that it's not necessary
-TIMEOUT="${6:-0}" # in seconds
-KILL_AFTER="${7:-true}" # whether or not to kill machine after running GUEST_SH. Does nothing if GUEST_SH is 'none'
+# command line options defaults
+HOST_SH="none" # file to run on host
+GUEST_SH="none" # file to run on guest
+QEMU_MEM="4096" # memory in MB of QEMU guest
+CORES="1" # number of cores to emulate
+EXTRA_DRIVE="none" # other hard drive to add. TODO: once dev is complete, setup default so that it's not necessary
+TIMEOUT="0" # in seconds
+KILL_AFTER="false" # whether or not to kill machine after running GUEST_SH. Does nothing if GUEST_SH is 'none'
+
+print_usage() {
+  echo "usage: $0 [-i pathtohostfile] [-g pathtoguestfile] [-m memorymb] [-c simulatedcores] [-d pathtodiskimg] [-t timeout(s)] [-e] [-k]"
+  echo "-i pathtohostfile: relative path to initial file to run on host (default: ${HOST_SH})"
+  echo "-g pathtoguestfile: relative path of file to run test and collect data on guest (default: ${GUEST_SH})"
+  echo "-m memorymb: memory in MB for QEMU guest (default: ${QEMU_MEM})"
+  echo "-c simulatedcores: simulated cores for QEMU guest (default: ${CORES})"
+  echo "-d pathtodiskimg: path to extra disk image (leave out if just using rootfs) (default: ${EXTRA_DRIVE})"
+  echo "-t timeout(s): QEMU guest (not test) timeout in seconds with 0 for no timeout (default: ${TIMEOUT})"
+  echo "-e: kill after running test (default: QEMU stays running)"
+  echo "-k: kill all running QEMU processes on machine and do nothing else"
+  echo "-h: print this message"
+  echo "read more at https://wiki.ubc.ca/PIM-SWAP"
+}
+
+kill_qemu() {
+  echo "Killing QEMU"
+  kill -9  $(pidof qemu-system-x86_64) # kills hung up qemu instances
+  echo "All QEMU instances killed"
+  exit 0
+} 
+
+while getopts 'i:g:m:c:d:t:ekh' flag; do
+  case "${flag}" in
+    i) HOST_SH="${OPTARG}" ;;
+    g) GUEST_SH="${OPTARG}" ;;
+    m) QEMU_MEM="${OPTARG}" ;;
+    c) CORES="${OPTARG}" ;;
+    d) EXTRA_DRIVE="${OPTARG}" ;;
+    t) TIMEOUT="${OPTARG}" ;;
+    e) KILL_AFTER='true' ;;
+    k) kill_qemu ;;
+    h) print_usage
+       exit 1 ;;
+    *) print_usage
+       exit 1 ;;
+  esac
+done
 
 # logs are named based on the program being tested, memory allocated and datetime
-TEST_PROGRAM=(${GUEST_SH//_/ })
+PROG_NAME=$(basename $GUEST_SH)
+TEST_PROGRAM=${PROG_NAME//_/ }
 LOG_PREFIX="${TEST_PROGRAM[0]}_${QEMU_MEM}MB_"
 LOG_DIR="logs"
 
@@ -66,7 +105,7 @@ timeout $TIMEOUT qemu-system-x86_64 -enable-kvm \
  -serial chardev:ser0 \
  -nographic \
  -net user,hostfwd=tcp::10022-:22 -net nic \
- -drive file=../swap-1g.raw,format=raw,if=ide \
+ -drive file=../swap-20g.raw,format=raw,if=ide \
  `if [ $EXTRA_DRIVE != "none" ]; then echo "-drive file=$EXTRA_DRIVE,format=raw,if=ide"; fi` &
 
 wait

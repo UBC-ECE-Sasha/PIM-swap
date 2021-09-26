@@ -4,8 +4,8 @@ table_config="type=file"
 key_sz=100
 value_sz=1024
 icount=40000000
-threads=((count=20,reads=1))
+threads=((count=10,reads=1),(count=10,updates=1))
 warmup=120
-sample_interval=10
+sample_interval=5
 populate_threads=8
-report_interval=10
+report_interval=5
