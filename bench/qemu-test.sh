@@ -105,8 +105,8 @@ timeout $TIMEOUT qemu-system-x86_64 -enable-kvm \
  -serial chardev:ser0 \
  -nographic \
  -net user,hostfwd=tcp::10022-:22 -net nic \
- -drive file=../swap-20g.raw,format=raw,if=ide \
- `if [ $EXTRA_DRIVE != "none" ]; then echo "-drive file=$EXTRA_DRIVE,format=raw,if=ide"; fi` &
+ -drive file=../swap-20g.raw,format=raw,if=ide,cache=none \
+ `if [ $EXTRA_DRIVE != "none" ]; then echo "-drive file=$EXTRA_DRIVE,format=raw,if=ide,cache=none"; fi` &
 
 wait
 
