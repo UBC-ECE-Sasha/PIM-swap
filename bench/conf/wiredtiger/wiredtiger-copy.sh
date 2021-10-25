@@ -22,7 +22,7 @@ if [ -f "$WTPERF_PATH" ]; then
     echo "Using wtperf in ${PWD}/${WTPERF_PATH}"
 else
     echo "wtperf not found. Building in ${WT_DIR}"
-
+    
     echo "wtperf built"
 fi
 
