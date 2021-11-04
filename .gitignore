@@ -1,3 +1,4 @@
+*DS_Store
 *.csv
 *.png
 *.out
@@ -11,3 +12,4 @@
 /bench/logs/
 /bench/csvs/
 /bench/wiredtiger/
+/bench/local_logs/
