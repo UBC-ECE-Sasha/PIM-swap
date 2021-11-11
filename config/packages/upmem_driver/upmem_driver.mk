@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-UPMEM_DRIVER_VERSION = 2021.1.3
+UPMEM_DRIVER_VERSION = 2021.3.0
 UPMEM_DRIVER_SOURCE = upmem-driver-$(UPMEM_DRIVER_VERSION).tar.gz
 UPMEM_DRIVER_SITE = http://sdk-releases.upmem.com/$(UPMEM_DRIVER_VERSION)
 UPMEM_DRIVER_LICENSE = NONE
