@@ -393,8 +393,9 @@ static int pimswap_frontswap_store_kernel(unsigned type, pgoff_t offset,
      src = kmap_atomic(page);
     // src contains the data to copy. 
 
-     kunmap_atomic(src);
-
+    kunmap_atomic(src);
+    printk("Kernel not implemented yet\n");
+    return -1; 
 
 }
 
