@@ -1,6 +1,7 @@
 # https://www.kernel.org/doc/html/latest/kbuild/modules.html
 
-cc-flags-y := -DDEBUG
+ccflags-y := -DDEBUG
+ccflags-y += -I$(PWD)/../upmem_driver-2021.3.0/uapi
 obj-m := pim_swap.o
 pim_swap-y := swap.o dpu.o alloc_static.o
 
