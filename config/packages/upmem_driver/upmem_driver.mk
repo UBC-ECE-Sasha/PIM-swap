@@ -12,7 +12,7 @@ UPMEM_DRIVER_LICENSE_FILES = COPYING
 
 # Archive is not actually gzipped, just use tar
 define UPMEM_DRIVER_EXTRACT_CMDS
-	tar --strip-components=1 -C $(@D) -xf $(UPMEM_DRIVER_DL_DIR)/upmem-driver-$(UPMEM_DRIVER_VERSION).tar.gz
+	tar -xf $(UPMEM_DRIVER_DL_DIR)/upmem-driver-$(UPMEM_DRIVER_VERSION).tar.gz -C $(PWD)/build/upmem_driver-$(UPMEM_DRIVER_VERSION) 
 endef
 
 $(eval $(kernel-module))

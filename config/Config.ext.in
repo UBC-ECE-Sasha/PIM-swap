@@ -4,6 +4,7 @@ menu "Linux Kernel Extensions"
 # PIM
 config BR2_LINUX_KERNEL_EXT_PIMSWAP
 	bool "Swap backend using UPMEM PIM for storage and compression"
+	select BR2_PACKAGE_UPMEM_DRIVER
 	select BR2_PACKAGE_PIMSWAP
 	# select BR2_PACKAGE_SUPPORT
 	help
