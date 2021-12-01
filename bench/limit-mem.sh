@@ -6,8 +6,9 @@
 
 RAMFS_DIR=/mnt/ramdisk
 TESTFILE=${RAMFS_DIR}/testfile
-RAMFS_FRAC=0.8
-RAMFS_SIZE=$((RAMFS_FRAC*$(cat /proc/meminfo | grep MemTotal | awk '{print $2}')/1024/1024))
+RAMFS_NUM=4
+RAMFS_DENOM=5
+RAMFS_SIZE=$((RAMFS_NUM*$(cat /proc/meminfo | grep MemTotal | awk '{print $2}')/RAMFS_DENOM/1024/1024))
 MEMLEFT=0
 PREV_MEM_AVAIL=4096
 CMD_MOUNT="false"
@@ -30,7 +31,7 @@ fill_ramdisk () {
 }
 
 specify_memory () {
-    if ["$MEMLEFT" -gt 0]; then  
+    if [ $MEMLEFT -gt 0 ]; then  
         clear_ramdisk
 
         FILL_MB=$((PREV_MEM_AVAIL-MEMLEFT))
@@ -56,7 +57,7 @@ while getopts 'd:m:p:s:cruh' flag; do
     d) RAMFS_DIR="${OPTARG}" ;;
     m) MEMLEFT="${OPTARG}" ;;
     p) PREV_MEM_AVAIL="${OPTARG}" ;;
-    s) RAMFS_SIZE="${OPTARG}" ;;;
+    s) RAMFS_SIZE="${OPTARG}" ;;
     c) CMD_CLEAR="true" ;;
     r) CMD_MOUNT="true" ;;
     u) CMD_UNMOUNT="true" ;;
@@ -67,19 +68,19 @@ while getopts 'd:m:p:s:cruh' flag; do
   esac
 done
 
-if ["$CMD_CLEAR" == "true"]; then
+if [ $CMD_CLEAR == "true" ]; then
     clear_ramdisk
 fi
 
-if ["$CMD_UNMOUNT" == "true"]; then
+if [ $CMD_UNMOUNT == "true" ]; then
     umount_ramdisk
 
-    if ["$CMD_MOUNT" != "true"]; then
+    if [ "$CMD_MOUNT" != "true" ]; then
         MEMLEFT=0
     fi
 fi
 
-if ["$CMD_MOUNT" == "true"]; then
+if [ $CMD_MOUNT == "true" ]; then
     mount_ramdisk
 fi
 
