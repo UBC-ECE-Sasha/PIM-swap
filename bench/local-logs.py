@@ -18,7 +18,7 @@ def removeN(val):
             return float(val[1:])
     return float(val)
 
-localLogDir = "local_logs"
+localLogDir = "logs"
 
 localLogList = os.listdir(localLogDir)
 
@@ -36,12 +36,14 @@ for dirname in localLogList:
         sdict["mem (MB)"] = int(dirname.split('_')[-2])
         sdict["program"] = '_'.join(dirname.split('_')[:-2])
         sdict["datetime"] = datetime.datetime.strptime(dirname.split('_')[-1], datetimeFormat)
-        sdict["runtime"] = 0
+        sdict["runtime (s)"] = 0
         sdict["mean cpu usage"] = 0
-        sdict["mean memavailable"] = 0
-        sdict["mean memfree"] = 0
+        sdict["mean memavailable (KB)"] = 0
+        sdict["mean memfree (KB)"] = 0
         sdict["mean physical mem (KB)"] = 0
         sdict["mean virtual mem (KB)"] = 0
+        sdict["max physical mem (KB)"] = 0
+        sdict["max virtual mem (KB)"] = 0
 
         for op in opList:
             sdict[op + " ops/sec"] = 0
@@ -54,7 +56,7 @@ for dirname in localLogList:
                 statLines = statFile.readlines()
                 for line in statLines:
                     if "Run completed" in line and line.split()[-1] == "seconds":
-                        sdict["runtime"] = float(line.split()[-2])
+                        sdict["runtime (s)"] = float(line.split()[-2])
                     for op in opList:
                         if (op + " operations") in line:
                             words = line.split()
@@ -66,7 +68,7 @@ for dirname in localLogList:
             monitorDF = pd.read_csv(monitorName, index_col=False)
             monitorDF["#time"] = pd.to_datetime(monitorDF["#time"], format=monitorDateFormat)
             endTime = monitorDF.iloc[-1]["#time"]
-            startTime = endTime - datetime.timedelta(seconds=sdict["runtime"])
+            startTime = endTime - datetime.timedelta(seconds=sdict["runtime (s)"])
             runMonitorDF = monitorDF[monitorDF["#time"] >= startTime].copy()
 
             for col in runMonitorDF.columns:
@@ -80,22 +82,24 @@ for dirname in localLogList:
             syslogDF = pd.read_csv(syslogName, index_col=False)
             syslogDF["date"] =  pd.to_datetime(syslogDF["date"], format=sysDateFormat)
             endTime = syslogDF.iloc[-1]["date"]
-            startTime = endTime - datetime.timedelta(seconds=sdict["runtime"])
+            startTime = endTime - datetime.timedelta(seconds=sdict["runtime (s)"])
             runlogDF = syslogDF[syslogDF["date"] >= startTime].copy()
 
             for col in runlogDF.columns:
                 if "phymem(kB)" in col:
                     runlogDF[col] = runlogDF[col].apply(convertKB)
                     sdict["mean physical mem (KB)"] = runlogDF[col].mean()
+                    sdict["max physical mem (KB)"] = runlogDF[col].max()
                 if "virtmem(kB)" in col:
                     runlogDF[col] = runlogDF[col].apply(convertKB)
                     sdict["mean virtual mem (KB)"] = runlogDF[col].mean()
+                    sdict["max virtual mem (KB)"] = runlogDF[col].max()
                 if "CPU(%)" in col:
                     sdict["mean cpu usage"] = runlogDF[col].mean()
                 if "free mem(kB)" in col:
-                    sdict["mean memfree"] = runlogDF[col].mean()
+                    sdict["mean memfree (KB)"] = runlogDF[col].mean()
                 if "available mem(kB)" in col:
-                    sdict["mean memavailable"] = runlogDF[col].mean()
+                    sdict["mean memavailable (KB)"] = runlogDF[col].mean()
 
         dictlist.append(sdict)
         

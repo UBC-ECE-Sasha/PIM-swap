@@ -18,6 +18,7 @@ CORES="1" # number of cores to emulate
 EXTRA_DRIVE="none" # other hard drive to add. TODO: once dev is complete, setup default so that it's not necessary
 TIMEOUT="0" # in seconds
 KILL_AFTER="false" # whether or not to kill machine after running GUEST_SH. Does nothing if GUEST_SH is 'none'
+SWAPFILE="../swap-1g.raw"
 
 print_usage() {
   echo "usage: $0 [-i pathtohostfile] [-g pathtoguestfile] [-m memorymb] [-c simulatedcores] [-d pathtodiskimg] [-t timeout(s)] [-e] [-k]"
@@ -29,6 +30,7 @@ print_usage() {
   echo "-t timeout(s): QEMU guest (not test) timeout in seconds with 0 for no timeout (default: ${TIMEOUT})"
   echo "-e: kill after running test (default: QEMU stays running)"
   echo "-k: kill all running QEMU processes on machine and do nothing else"
+  echo "-s: swapfile: relative path to file to swap onto with QEMU"
   echo "-h: print this message"
   echo "read more at https://wiki.ubc.ca/PIM-SWAP"
 }
@@ -40,7 +42,7 @@ kill_qemu() {
   exit 0
 } 
 
-while getopts 'i:g:m:c:d:t:ekh' flag; do
+while getopts 'i:g:m:c:d:t:s:ekh' flag; do
   case "${flag}" in
     i) HOST_SH="${OPTARG}" ;;
     g) GUEST_SH="${OPTARG}" ;;
@@ -48,6 +50,7 @@ while getopts 'i:g:m:c:d:t:ekh' flag; do
     c) CORES="${OPTARG}" ;;
     d) EXTRA_DRIVE="${OPTARG}" ;;
     t) TIMEOUT="${OPTARG}" ;;
+    s) SWAPFILE="${OPTARG}" ;;
     e) KILL_AFTER='true' ;;
     k) kill_qemu ;;
     h) print_usage
@@ -105,7 +108,7 @@ timeout $TIMEOUT qemu-system-x86_64 -enable-kvm \
  -serial chardev:ser0 \
  -nographic \
  -net user,hostfwd=tcp::10022-:22 -net nic \
- -drive file=../swap-20g.raw,format=raw,if=ide,cache=none \
+ -drive file=$SWAPFILE,format=raw,if=ide,cache=none \
  `if [ $EXTRA_DRIVE != "none" ]; then echo "-drive file=$EXTRA_DRIVE,format=raw,if=ide,cache=none"; fi` &
 
 wait
