@@ -19,6 +19,7 @@ cp config/Config.in $BUILDROOT_LOCATION/package
 cp -R config/pimswap $BUILDROOT_LOCATION/package
 cp -R config/linux_config $BUILDROOT_LOCATION
 cp -R config/rootfs_overlay $BUILDROOT_LOCATION
+cp bench/log_mem.sh $BUILDROOT_LOCATION/rootfs_overlay/root/
 cp -R config/upmem $BUILDROOT_LOCATION/board
 
 # set up the buildroot output directory
