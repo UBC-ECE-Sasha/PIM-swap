@@ -24,6 +24,7 @@ SWAPFILE="../swap-1g.raw"
 print_usage() {
   echo "usage: $0 [-i pathtohostfile] [-g pathtoguestfile] [-m memorymb] [-c simulatedcores] [-d pathtodiskimg] [-t timeout(s)] [-e] [-k]"
   echo "-i pathtohostfile: relative path to initial file to run on host (default: ${HOST_SH})"
+  echo "-f config file: wtperf config to use for tests"
   echo "-g pathtoguestfile: relative path of file to run test and collect data on guest (default: ${GUEST_SH})"
   echo "-m memorymb: memory in MB for QEMU guest (default: ${QEMU_MEM})"
   echo "-c simulatedcores: simulated cores for QEMU guest (default: ${CORES})"
