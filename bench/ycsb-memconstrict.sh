@@ -1,6 +1,4 @@
 #!/bin/bash
-#
-# Runs ycsb-c4 with various memory constraints
 
 CONF_DIR="conf/wiredtiger"
 HOST_FILE="${CONF_DIR}/wiredtiger-copy.sh"
@@ -14,5 +12,5 @@ MEM=24576
 for i in {1:8}
 do
     echo testing $MEM
-    ./qemu-test.sh -i $HOST_FILE -g $GUEST_FILE -m $MEM -c $CORES -d $DISK_IMG -s $SWP -e
+    ./qemu-test.sh -f ycsb-ca.wtperf -m $MEM -c $CORES -d $DISK_IMG -s $SWP -e
 done

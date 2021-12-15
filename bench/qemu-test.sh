@@ -18,6 +18,7 @@ CORES="1" # number of cores to emulate
 EXTRA_DRIVE="none" # other hard drive to add. TODO: once dev is complete, setup default so that it's not necessary
 TIMEOUT="0" # in seconds
 KILL_AFTER="false" # whether or not to kill machine after running GUEST_SH. Does nothing if GUEST_SH is 'none'
+TEST_CONFIG="none"
 SWAPFILE="../swap-1g.raw"
 
 print_usage() {
@@ -42,9 +43,10 @@ kill_qemu() {
   exit 0
 } 
 
-while getopts 'i:g:m:c:d:t:s:ekh' flag; do
+while getopts 'i:f:g:m:c:d:t:s:ekh' flag; do
   case "${flag}" in
     i) HOST_SH="${OPTARG}" ;;
+    f) TEST_CONFIG="${OPTARG}" ;;
     g) GUEST_SH="${OPTARG}" ;;
     m) QEMU_MEM="${OPTARG}" ;;
     c) CORES="${OPTARG}" ;;
@@ -60,9 +62,20 @@ while getopts 'i:g:m:c:d:t:s:ekh' flag; do
   esac
 done
 
-# logs are named based on the program being tested, memory allocated and datetime
 PROG_NAME=$(basename $GUEST_SH)
 TEST_PROGRAM=${PROG_NAME//_/ }
+
+if [[ $TEST_CONFIG == *.wtperf ]]
+then
+  CONF_DIR="conf/wiredtiger"
+  HOST_SH="${CONF_DIR}/wiredtiger-copy.sh"
+  GUEST_SH="${CONF_DIR}/wiredtiger-run-on-guest.sh"
+
+  CONFIG_NAME=$(basename $TEST_CONFIG)
+  TEST_PROGRAM=$CONFIG_NAME
+fi
+
+# logs are named based on the program being tested, memory allocated and datetime
 LOG_PREFIX="${TEST_PROGRAM[0]}_${QEMU_MEM}MB_"
 LOG_DIR="logs"
 
@@ -83,14 +96,21 @@ echo "Test execution file: $GUEST_SH" >> $STDOUT_LOG_NAME
   then 
   bash $HOST_SH
 fi && \
-if [ $GUEST_SH != "none" ] # run GUEST_SH on guest if it exists
-then
-  cat $GUEST_SH
-  if [ $KILL_AFTER == "true" ]
-    then
-    echo poweroff -f # poweroff after running GUEST_SH if KILL_AFTER is enabled
-  fi
-fi | sshpass -p "root" ssh root@localhost \
+
+(if [ $EXTRA_DRIVE != "none" ]
+  then
+  echo chmod +x mound_sdb.sh
+  echo ./mount_sdb.sh
+fi
+
+echo CONFIG=$CONFIG_NAME
+cat $GUEST_SH
+
+if [ $KILL_AFTER == "true" ]
+  then
+  echo poweroff -f # poweroff after running GUEST_SH if KILL_AFTER is enabled
+fi
+)| sshpass -p "root" ssh root@localhost \
   -p 10022 \
   -o "UserKnownHostsFile /dev/null" \
   -o StrictHostKeyChecking=no) \
