@@ -20,8 +20,8 @@ qemu-system-x86_64 -enable-kvm \
  -serial chardev:ser0 \
  -net user,hostfwd=tcp::10022-:22 -net nic \
  -nographic \
- -drive file=swap-1g.raw,format=raw,if=ide
-
+ -drive file=swap-1g.raw,format=raw,if=ide \
+ -drive id=additional_disk,file=disk_5G.raw,if=ide,format=raw 
 # For VNC: -vnc :1
 
 # user networking, forward host port to ssh quest port

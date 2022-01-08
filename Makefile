@@ -1,5 +1,5 @@
 CC=gcc
-
+ccflags-y := -I/home/shaurya/PIM-swap/output/build/upmem_driver-2021.3.0/uapi
 .PHONY: tags
 
 pim-swap:
