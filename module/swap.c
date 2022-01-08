@@ -40,55 +40,6 @@ typedef struct page_descriptor {
 static struct dpu_rank_t rank; 
 static struct dpu_t dpu;
 
-
-static __mram_ptr uint8_t *pimswap_alloc_page(unsigned int id, unsigned int length)
-{
-	__mram_ptr uint8_t *page;
-
-	//printk("%s: id=%u length=%u\n", __func__, id, length);
-
-	page = pimswap_alloc_page_static(id, length);
-
-	return page;
-}
-
-static void pimswap_free_page(unsigned int id)
-{
-	//printk("%s: id=%u\n", __func__, id);
-
-	pimswap_free_page_static(id);
-}
-
-static __mram_ptr uint8_t *pimswap_lookup_index(unsigned int id, unsigned int *length)
-{
-	//printk("%s: id=%u\n", __func__, id);
-
-	return pimswap_lookup_index_hash(id, length);
-}
-
-int dpu_invalidate_main(void)
-{
-	uint32_t id;
-	uint32_t length;
-
-	// read page ID
-	mram_read(MRAM_VAR(trans_page) + PAGE_SIZE, &id, sizeof(uint32_t));
-
-	if (!(id & PAGE_VALID)) {
-		return 0;
-	}
-	id &= ~PAGE_VALID; // remove valid flag
-
-	printk("[%u] Invalidating id %u\n", get_current_dpu(), id);
-	pimswap_free_page(id);
-
-	// the hash entry is not unique, so only remove it if it is the one we are looking for
-	if (pimswap_lookup_index_hash(id, &length))
-		pimswap_insert_index_hash(id, 0, 0);
-
-	return 0;
-}
-
 int lzo_decompress_main(void)
 {
 	int ret;
@@ -264,18 +215,6 @@ static void pimswap_frontswap_init(unsigned type)
 {
 }
 
-/**
-	compress and store a single page
-
-	This is called by the mm subsystem when a page needs to be swapped out
-*/
- static int pimswap_frontswap_store_old(unsigned type, pgoff_t offset,
-				struct page *page)
-{
-	// success!
-	return 0;
-}
-
 /*
  * Invoking pim from the kernel. 
  * Currently we get a page and store it to mram which
@@ -286,7 +225,7 @@ static void pimswap_frontswap_init(unsigned type)
  *  page - struct that represents the physical page. 
  * @Return - integer representing a successful store or negative on failure.
  */
-static int pimswap_frontswap_store_kernel(unsigned type, pgoff_t offset,
+static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
 				struct page *page) {
     uint8_t dpu_index, rank_index; 
     struct dpu_rank_t; 
@@ -328,6 +267,7 @@ static int pimswap_frontswap_load(unsigned type, pgoff_t offset,
 /* frees an entry in zswap */
 static void pimswap_frontswap_invalidate_page(unsigned type, pgoff_t offset)
 {
+    return 0; 
 }
 
 /* frees all zswap entries for the given swap type */
@@ -353,20 +293,8 @@ static int __init init_pim_swap(void)
 		return -1;
 	}
 
-		// make sure it is zeroed
-		//memset(dpus[i].mram, 0, MRAM_PER_DPU);
-
-/* Load once if the program has compress + decompress combined
-	Right now, they are separate entry points, so are loaded individually
-	pr_err("loading\n");
-	if (dpu_load(dpus, snappy_main, NULL) != DPU_OK) {
-		pr_err("error in dpu_load\n");
-		return -2;
-	}
-*/
-
-   tfm = crypto_alloc_comp(pimswap_compressor, 0, 0);
-   if (IS_ERR(tfm)) {
+    tfm = crypto_alloc_comp(pimswap_compressor, 0, 0);
+    if (IS_ERR(tfm)) {
       printk("could not alloc crypto comp %s : %ld\n",
              pimswap_compressor, PTR_ERR(tfm));
       return PTR_ERR(tfm);
