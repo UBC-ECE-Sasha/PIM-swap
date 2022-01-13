@@ -231,6 +231,7 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
     uint8_t dpu_index, rank_index; 
     struct dpu_rank_t; 
     void * src;
+    uint32_t page_id; 
     // Get the rank using the hash function.
     rank_index = RANK_INDEX_FROM_OFFSET(offset);
 
@@ -269,7 +270,7 @@ static int pimswap_frontswap_load(unsigned type, pgoff_t offset,
 /* frees an entry in zswap */
 static void pimswap_frontswap_invalidate_page(unsigned type, pgoff_t offset)
 {
-    return 0; 
+    return; 
 }
 
 /* frees all zswap entries for the given swap type */
@@ -290,17 +291,21 @@ static int __init init_pim_swap(void)
 {
 	pr_err("%s: started\n", __func__);
 
-	if (dpu_alloc(DPU_ALLOCATE_ALL, NULL, &dpus) != DPU_OK) {
+    // TODO change with kernel API 
+    // functions - dpu_rank_alloc
+    // dpu_get_number_of_dpus_for_rank 
+	/* if (dpu_alloc(DPU_ALLOCATE_ALL, NULL, &dpus) != DPU_OK) {
 		pr_err("error in dpu_alloc\n");
 		return -1;
-	}
+	} */
 
-    tfm = crypto_alloc_comp(pimswap_compressor, 0, 0);
+    // TODO - do we need this? I would assume that's a no.
+    /*tfm = crypto_alloc_comp(pimswap_compressor, 0, 0);
     if (IS_ERR(tfm)) {
       printk("could not alloc crypto comp %s : %ld\n",
              pimswap_compressor, PTR_ERR(tfm));
       return PTR_ERR(tfm);
-   }
+   } */
 
 	// make sure 'write through' is off - we don't want to wait for slow
 	// swap devices.
@@ -308,13 +313,13 @@ static int __init init_pim_swap(void)
 
 	frontswap_register_ops(&pimswap_frontswap_ops);
 
-	printk("DPUs per rank: %u\n", DPUS_PER_RANK);
-	printk("MRAM size: %d\n", MRAM_PER_DPU);
+	// printk("DPUs per rank: %u\n", DPUS_PER_RANK);
+	// printk("MRAM size: %d\n", MRAM_PER_DPU);
 	printk("MRAM layout:\n");
-	printk("0x%04lx - 0x%4lx: reserved\n", offsetof(struct mram_layout, reserved), offsetofend(struct mram_layout, reserved));
-	printk("0x%04lx - 0x%4lx: transfer page\n", offsetof(struct mram_layout, trans_page), offsetofend(struct mram_layout, trans_page));
-	printk("0x%04lx - 0x%4lx: directory\n", offsetof(struct mram_layout, directory), offsetof(struct mram_layout, directory) + DIRECTORY_SIZE);
-	printk("0x%04lx - 0x%4lx: storage\n", offsetof(struct mram_layout, storage), offsetof(struct mram_layout, storage) + STORAGE_SIZE);
+	// printk("0x%04lx - 0x%4lx: reserved\n", offsetof(struct mram_layout, reserved), offsetofend(struct mram_layout, reserved));
+	// printk("0x%04lx - 0x%4lx: transfer page\n", offsetof(struct mram_layout, trans_page), offsetofend(struct mram_layout, trans_page));
+	// printk("0x%04lx - 0x%4lx: directory\n", offsetof(struct mram_layout, directory), offsetof(struct mram_layout, directory) + DIRECTORY_SIZE);
+	// printk("0x%04lx - 0x%4lx: storage\n", offsetof(struct mram_layout, storage), offsetof(struct mram_layout, storage) + STORAGE_SIZE);
 
 	printk("Total storage space: %d bytes\n", STORAGE_SIZE);
 	printk("Allocation table size: %lu\n", ALLOC_TABLE_SIZE);
@@ -335,9 +340,9 @@ static void __exit exit_pim_swap(void)
 {
 	pr_err("%s: exit\n", __func__);
 
-	dpu_free(dpus);
+	// dpu_free(dpus);
 
-   crypto_free_comp(tfm);
+    // crypto_free_comp(tfm);
 }
 
 module_init(init_pim_swap);
