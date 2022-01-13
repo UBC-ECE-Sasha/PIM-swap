@@ -4,7 +4,6 @@
 #include <linux/frontswap.h>
 #include <linux/crypto.h>
 #include "snappy_compress.h"
-#include "mram.h"
 #include "alloc_static.h"
 #include <dpu_memory.h>
 #include <dpu_runner.h>
