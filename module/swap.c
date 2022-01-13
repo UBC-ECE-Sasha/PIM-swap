@@ -40,7 +40,7 @@ typedef struct page_descriptor {
 static struct dpu_rank_t rank; 
 static struct dpu_t dpu;
 
-int lzo_decompress_main(void)
+/*int lzo_decompress_main(void)
 {
 	int ret;
 	uint32_t new_len = PAGE_SIZE;
@@ -104,12 +104,12 @@ int lzo_decompress_main(void)
 	mram_write(out_page_w, MRAM_VAR(trans_page), PAGE_SIZE);
 
 	return 0;
-}
+} */
 
 /**
 	Entry point for DPU compression
 */
-int lzo_compress_main(void)
+/*int lzo_compress_main(void)
 {
 	int ret;
 	uint32_t compressed_length = PAGE_SIZE;
@@ -209,7 +209,7 @@ int lzo_compress_main(void)
 	mram_write(&status, MRAM_VAR(trans_page) + PAGE_SIZE, sizeof(uint32_t));
 
 	return 0;
-}
+}*/
 
 static void pimswap_frontswap_init(unsigned type)
 {
@@ -227,9 +227,10 @@ static void pimswap_frontswap_init(unsigned type)
  */
 static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
 				struct page *page) {
+    
     uint8_t dpu_index, rank_index; 
     struct dpu_rank_t; 
-    voud * src;
+    void * src;
     // Get the rank using the hash function.
     rank_index = RANK_INDEX_FROM_OFFSET(offset);
 
@@ -244,7 +245,8 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
     }
 
     // We will try to support all dpus.
-     dpu_rank_t = rank;
+    // TODO - is this really needed?
+    // dpu_rank_t = rank;
 
      src = kmap_atomic(page);
     // src contains the data to copy. 
@@ -277,9 +279,9 @@ static void pimswap_frontswap_invalidate_area(unsigned type)
 }
 
 static struct frontswap_ops pimswap_frontswap_ops = {
-	.store = pimswap_frontswap_store_kernel,
-	.load = NULL,
-	.invalidate_page = NULL,
+	.store = pimswap_frontswap_store,
+	.load = pimswap_frontswap_load,
+	.invalidate_page = pimswap_frontswap_invalidate_page,
 	.invalidate_area = NULL,
 	.init = pimswap_frontswap_init
 };
