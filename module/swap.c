@@ -3,17 +3,17 @@
 #include <linux/module.h>
 #include <linux/frontswap.h>
 #include <linux/crypto.h>
-#include "snappy_compress.h"
-#include "alloc_static.h"
-#include <dpu_memory.h>
-#include <dpu_runner.h>
-#include <dpu_management.h>
+// #include "snappy_compress.h"
+#include <uapi/dpu_memory.h>
+#include <uapi/dpu_runner.h>
+#include <uapi/dpu_management.h>
 
 #define USE_COMPRESSION
 #define NUM_RANKS 1
 // offset is divided like this: rank (1 bit) | id (31 bits) | dpu index (6 bits) |
-#define DPU_INDEX_FROM_OFFSET(_offset) ((uint8_t)(_offset & ((1 << __DPUS_PER_RANK_LOG2) - 1)))
-#define ID_FROM_OFFSET(_offset) ((uint32_t)(_offset >> __DPUS_PER_RANK_LOG2) & 0x7FFFFFFF)
+// TODO just changed DPU_PER_RANK_LOG2 to a constant for now.
+#define DPU_INDEX_FROM_OFFSET(_offset) ((uint8_t)(_offset & ((1 << 2) - 1)))
+#define ID_FROM_OFFSET(_offset) ((uint32_t)(_offset >> 2) & 0x7FFFFFFF)
 #define RANK_INDEX_FROM_OFFSET(_offset) ((uint8_t)(_offset >> 24))
 #define PAGE_VALID 0x80000000
 
@@ -36,8 +36,8 @@ typedef struct page_descriptor {
 } page_descriptor;
 
 // Kernel datastructures for dpus.
-static struct dpu_rank_t rank; 
-static struct dpu_t dpu;
+static struct dpu_rank_t *rank; 
+static struct dpu_t *dpu;
 
 /*int lzo_decompress_main(void)
 {
@@ -320,13 +320,13 @@ static int __init init_pim_swap(void)
 	// printk("0x%04lx - 0x%4lx: directory\n", offsetof(struct mram_layout, directory), offsetof(struct mram_layout, directory) + DIRECTORY_SIZE);
 	// printk("0x%04lx - 0x%4lx: storage\n", offsetof(struct mram_layout, storage), offsetof(struct mram_layout, storage) + STORAGE_SIZE);
 
-	printk("Total storage space: %d bytes\n", STORAGE_SIZE);
-	printk("Allocation table size: %lu\n", ALLOC_TABLE_SIZE);
-	printk("Storage block size: %d\n", STORAGE_BLOCK_SIZE);
-	printk("Total storage blocks: %d\n", NUM_STORAGE_BLOCKS);
-	printk("Number of L1 entries: %d\n", ALLOC_TABLE_L1_ENTRIES);
-	printk("Number of L2 entries: %d\n", ALLOC_TABLE_L2_ENTRIES);
-	printk("Number of L2 sections: %d\n", NUM_L2_SECTIONS);
+	// printk("Total storage space: %d bytes\n", STORAGE_SIZE);
+	// printk("Allocation table size: %lu\n", ALLOC_TABLE_SIZE);
+	// printk("Storage block size: %d\n", STORAGE_BLOCK_SIZE);
+	// printk("Total storage blocks: %d\n", NUM_STORAGE_BLOCKS);
+	// printk("Number of L1 entries: %d\n", ALLOC_TABLE_L1_ENTRIES);
+	// printk("Number of L2 entries: %d\n", ALLOC_TABLE_L2_ENTRIES);
+	// printk("Number of L2 sections: %d\n", NUM_L2_SECTIONS);
 #ifdef DIRECTORY_HASH
 	printk("Using a hash table with %lu entries\n", NUM_HASH_ENTRIES);
 #endif // DIRECTORY_HASH

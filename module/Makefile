@@ -1,9 +1,9 @@
 # https://www.kernel.org/doc/html/latest/kbuild/modules.html
 
 ccflags-y := -DDEBUG
-ccflags-y += -I$(PWD)/../upmem_driver-2021.3.0/uapi
+ccflags-y += -I$(PWD)/../upmem_driver-2021.3.0
 obj-m := pim_swap.o
-pim_swap-y := swap.o dpu.o alloc_static.o
+pim_swap-y := swap.o
 
 ifeq ($(KERNELRELEASE),)
 KDIR ?= /usr/src/linux-headers-`uname -r`

@@ -6,7 +6,7 @@
 #define _DPU_COMPRESS_H_
 
 //JKN #include "common.h"
-#include "dpu.h"
+#include <uapi/dpu.h>
 #include "seqread.h"
 
 #define NR_TASKLETS 1

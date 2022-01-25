@@ -14,7 +14,7 @@ PIMSWAP_CONF_OPTS = \
 	--with-linux-dir=$(LINUX_DIR) \
 	--with-module-dir=/lib/modules/$(LINUX_VERSION_PROBED)/pimswap
 
-PIMSWAP_MODULE_MAKE_OPTS = EXTRA_CFLAGS=-I$(PWD)/build/upmem_driver-2021.3.0/modules/uapi 
+PIMSWAP_MODULE_MAKE_OPTS = EXTRA_CFLAGS=-I$(PWD)/build/upmem_driver-2021.3.0/modules 
 #PIMSWAP_MAKE = $(MAKE1)
 
 $(eval $(kernel-module))
