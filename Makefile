@@ -1,5 +1,11 @@
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright 2020 UPMEM. All rights reserved.
+
 CC=gcc
-ccflags-y := -I/home/shaurya/PIM-swap/output/build/upmem_driver-2021.3.0/
+ccflags-y := -I/home/shaurya/PIM-swap/output/build/upmem_driver-2021.3.0/modules
+ccflags-y += -I/home/shaurya/PIM-swap/output/build/upmem_driver-2021.3.0/mappings
+
 .PHONY: tags
 
 pim-swap:

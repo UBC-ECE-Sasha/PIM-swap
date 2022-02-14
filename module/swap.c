@@ -29,6 +29,15 @@ enum {
 	STATUS_ERROR_STORE_NO_SPACE
 };
 
+struct allocated_dpu_page_node {
+    int offset_in_mram;
+    int sz; 
+    struct page_descriptor *page;
+    struct allocated_dpu_page_node* next; 
+};
+
+struct allocated_dpu_page_node *rank_0;
+
 typedef struct page_descriptor {
 	uint8_t data[PAGE_SIZE];
 	uint32_t id;	// page identifier - high bit is used as 'page valid'
@@ -199,7 +208,7 @@ static struct dpu_t *dpu;
 #ifdef USE_COMPRESSION
 	//printk("Writing page to 0x%llx (length 0x%x)\n", (uint64_t)out_page_m, compressed_length);
 	//print_hex_dump(KERN_ERR, "after compress (m): ", DUMP_PREFIX_ADDRESS,
-	 //   32, 1, (uint8_t*)((uint64_t)out_page_m + get_dpu(get_current_dpu())->mram), 32, false);
+	 //   32, 1, (vint8_t*)((uint64_t)out_page_m + get_dpu(get_current_dpu())->mram), 32, false);
 #endif // USE_COMPRESSION
 
 	//printk("%s done\n", __func__);
@@ -212,6 +221,11 @@ static struct dpu_t *dpu;
 
 static void pimswap_frontswap_init(unsigned type)
 {
+    rank_0 = vmalloc(sizeof(struct allocated_dpu_page_node));
+    rank_0->offset_in_mram = 0; 
+    rank_0->sz = 64*1024*1024;
+    rank_0->page = NULL;
+    rank_0->next = NULL;
 }
 
 /*
@@ -228,9 +242,11 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
 				struct page *page) {
     
     uint8_t dpu_index, rank_index; 
-    struct dpu_rank_t; 
+    struct dpu_rank_t *rank; 
     void * src;
     uint32_t page_id; 
+    struct allocated_dpu_page_node *current_node = rank_0; 
+    int status;
     // Get the rank using the hash function.
     rank_index = RANK_INDEX_FROM_OFFSET(offset);
 
@@ -239,21 +255,64 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
 
     page_id = ID_FROM_OFFSET(offset);
     
+    // TODO - for now stick to rank 0.
     if(rank_index != 0) {
         printk("ERROR: rank %u doesn't exist!\n", rank_index);
         return -1; 
     }
 
-    // We will try to support all dpus.
-    // TODO - is this really needed?
-    // dpu_rank_t = rank;
+    if(dpu_index != 0) {
+        printk("ERROR: dpu %u doesn't exist!\n", dpu_index);
+        return -1; 
+    }
 
-     src = kmap_atomic(page);
+    printk("Found page to support\n");
+
+    // We will try to support all dpus.
+    status = dpu_rank_alloc(&rank);
+    if(status != 0) {
+        printk("Unable to get rank!\n");
+        return -1; 
+     }
+
+     // Get 0 dpu.
+    dpu = dpu_get(rank, 0, 0);
+
+    src = kmap_atomic(page);
     // src contains the data to copy. 
+    // Go to the next free offset.
+    while(current_node->next != NULL) {
+        current_node = current_node->next; 
+    }
+
+    if(current_node->offset_in_mram == 64*1024*1024) 
+        return -1; 
+
+    int mram_offset = current_node->offset_in_mram; 
+
+    struct allocated_dpu_page_node *new_node = vmalloc(sizeof(struct allocated_dpu_page_node));
+
+    new_node->offset_in_mram = current_node->offset_in_mram;
+    new_node->sz = 4096; 
+    new_node->page = NULL; 
+    new_node->next = current_node; 
+    current_node->offset_in_mram += 4096; 
+    current_node->sz -= 4096;
+
+    if(new_node->offset_in_mram == 0) 
+        rank_0 = new_node; 
+    
+    // TODO - write dpu code here. 
+    status = dpu_copy_to_wram_for_dpu(dpu, 0x1000, src, 4096/32);
+
+    if(status != 0) {
+        printk("DPU wram copy didn't work\n");
+        kunmap_atomic(src);
+        return -1;
+    }
 
     kunmap_atomic(src);
-    printk("Kernel not implemented yet\n");
-    return -1; 
+    return 0; 
 }
 
 /** Load a compressed page (swap in)
