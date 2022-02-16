@@ -9,18 +9,21 @@
 
 ROOT=buildroot
 
+RAM_SIZE=1G
+id=0
+MAPPING_OPTIONS="$MAPPING_OPTIONS --object memory-backend-file,id=pim$id,size=8G,mem-path=/dev/dax$id.$id,align=1G --device pc-dimm,id=dimm$id,memdev=pim$id"
+
 qemu-system-x86_64 -enable-kvm \
+ -m ${RAM_SIZE}M,slots=$NR_SLOTS,maxmem=${MAX_SIZE}M $MAPPING_OPTIONS \
  -kernel output/images/bzImage \
  -initrd output/images/rootfs.cpio.gz \
  -append "console=ttyS0" \
  -cpu host \
- -m 2248 \
  -usb \
  -chardev pty,id=ser0 \
  -serial chardev:ser0 \
  -net user,hostfwd=tcp::10022-:22 -net nic \
  -nographic \
- -drive file=swap-1g.raw,format=raw,if=ide \
  -drive id=additional_disk,file=disk_5G.raw,if=ide,format=raw 
 # For VNC: -vnc :1
 
