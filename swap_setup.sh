@@ -1,11 +1,14 @@
 #!/bin/bash
 
+# 2022-02-15 Shaurya Patel
+# Setup for the swap disk to be used by qemu. Probably don't need this if you have the actual device.
+
 set -e
 
-if [ ${EUID} != 0 ]; then
-    echo "'$0' must be run as root" 1>&2
-    exit 1
-fi
+#if [ ${EUID} != 0 ]; then
+#    echo "'$0' must be run as root" 1>&2
+#    exit 1
+#fi
 
 SWAP_IMAGE="swap-1g.raw"
 
