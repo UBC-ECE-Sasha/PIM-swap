@@ -16,7 +16,7 @@ cp config/qemu_pim_defconfig $BUILDROOT_LOCATION/configs
 cp config/Config.ext.in $BUILDROOT_LOCATION/linux
 cp config/linux-ext-pimswap.mk $BUILDROOT_LOCATION/linux
 cp config/Config.in $BUILDROOT_LOCATION/package
-cp -R config/pimswap $BUILDROOT_LOCATION/package
+cp -R config/{pimswap,packages/upmem_driver} $BUILDROOT_LOCATION/package
 cp -R config/linux_config $BUILDROOT_LOCATION
 cp -R config/rootfs_overlay $BUILDROOT_LOCATION
 cp bench/log_mem.sh $BUILDROOT_LOCATION/rootfs_overlay/root/

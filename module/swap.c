@@ -7,6 +7,9 @@
 #include "snappy_compress.h"
 #include "mram.h"
 #include "alloc_static.h"
+#include <uapi/dpu/dpu_memory.h>
+#include <uapi/dpu/dpu_runner.h>
+#include <uapi/dpu/dpu_management.h>
 
 #define USE_COMPRESSION
 #define NUM_RANKS 1
@@ -40,6 +43,11 @@ static page_descriptor out_buffer[DPUS_PER_RANK]; // going to the DPU
 static uint64_t out_buffer_bmp;
 struct crypto_comp *tfm;
 static char *pimswap_compressor = "lzo";
+
+// Kernel datastructures for dpus.
+static struct dpu_rank_t rank; 
+static struct dpu_t dpu;
+
 
 static __mram_ptr uint8_t *pimswap_alloc_page(unsigned int id, unsigned int length)
 {
@@ -269,7 +277,7 @@ static void pimswap_frontswap_init(unsigned type)
 
 	This is called by the mm subsystem when a page needs to be swapped out
 */
-static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
+ static int pimswap_frontswap_store_old(unsigned type, pgoff_t offset,
 				struct page *page)
 {
 	uint8_t dpu_index, rank_index;
@@ -349,6 +357,45 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
 
 	// success!
 	return 0;
+}
+
+/*
+ * Invoking pim from the kernel. 
+ * Currently we get a page and store it to mram which
+ * is supplied by the hash function. 
+ * @Input:
+ *  type - 
+ *  offset - offset into the page. 
+ *  page - struct that represents the physical page. 
+ * @Return - integer representing a successful store or negative on failure.
+ */
+static int pimswap_frontswap_store_kernel(unsigned type, pgoff_t offset,
+				struct page *page) {
+    uint8_t dpu_index, rank_index; 
+    struct dpu_rank_t; 
+    voud * src;
+    // Get the rank using the hash function.
+    rank_index = RANK_INDEX_FROM_OFFSET(offset);
+
+    // Get the dpu number using the hash function.
+    dpu_index = DPU_INDEX_FROM_OFFSET(offset); 
+
+    page_id = ID_FROM_OFFSET(offset);
+    
+    if(rank_index != 0) {
+        printk("ERROR: rank %u doesn't exist!\n", rank_index);
+        return -1; 
+    }
+
+    // We will try to support all dpus.
+     dpu_rank_t = rank;
+
+     src = kmap_atomic(page);
+    // src contains the data to copy. 
+
+     kunmap_atomic(src);
+
+
 }
 
 /** Load a compressed page (swap in)
@@ -493,7 +540,7 @@ static void pimswap_frontswap_invalidate_area(unsigned type)
 }
 
 static struct frontswap_ops pimswap_frontswap_ops = {
-	.store = pimswap_frontswap_store,
+	.store = pimswap_frontswap_store_kernel,
 	.load = pimswap_frontswap_load,
 	.invalidate_page = pimswap_frontswap_invalidate_page,
 	.invalidate_area = pimswap_frontswap_invalidate_area,
