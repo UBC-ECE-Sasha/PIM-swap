@@ -9,22 +9,38 @@
 
 ROOT=buildroot
 
-RAM_SIZE=1G
+RAM_SIZE=100
 id=0
-MAPPING_OPTIONS="$MAPPING_OPTIONS --object memory-backend-file,id=pim$id,size=8G,mem-path=/dev/dax$id.$id,align=1G --device pc-dimm,id=dimm$id,memdev=pim$id"
+NR_RANKS=1
+NR_SLOTS=2
+MAX_MEM=0
+MAPPING_OPTIONS=""
 
-qemu-system-x86_64 -enable-kvm \
- -m ${RAM_SIZE}M,slots=$NR_SLOTS,maxmem=${MAX_SIZE}M $MAPPING_OPTIONS \
+id=0                                                                             
+while [ $id -lt $NR_RANKS ]; do 
+    if [ ! -c "/dev/dax$id.$id" ]; then
+        die "Unable to map $NR_RANKS ranks"
+    fi
+    # Add 200M per rank
+    RAM_SIZE=$((RAM_SIZE + 200))
+    MAPPING_OPTIONS="$MAPPING_OPTIONS --object memory-backend-file,id=pim$id,size=8G,mem-path=/dev/dax$id.$id,align=1G --device pc-dimm,id=dimm$id,memdev=pim$id"
+    id=$((id + 1))
+done
+
+MAX_MEM=$((RAM_SIZE + 8192*NR_RANKS))
+
+qemu-system-x86_64 -M q35 -enable-kvm \
+ -m ${RAM_SIZE}M,slots=$NR_SLOTS,maxmem=${MAX_MEM}M $MAPPING_OPTIONS \
  -kernel output/images/bzImage \
  -initrd output/images/rootfs.cpio.gz \
- -append "console=ttyS0" \
+ -append "rootwait root=/dev/vda console=ttyS0 nokaslr memmap=2G!4G" \
  -cpu host \
  -usb \
  -chardev pty,id=ser0 \
  -serial chardev:ser0 \
  -net user,hostfwd=tcp::10022-:22 -net nic \
  -nographic \
- -drive id=additional_disk,file=disk_5G.raw,if=ide,format=raw 
+ -drive file=swap-1g.raw,if=ide,format=raw 
 # For VNC: -vnc :1
 
 # user networking, forward host port to ssh quest port

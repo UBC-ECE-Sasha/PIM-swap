@@ -226,6 +226,22 @@ static void pimswap_frontswap_init(unsigned type)
     rank_0->sz = 64*1024*1024;
     rank_0->page = NULL;
     rank_0->next = NULL;
+  int status = dpu_rank_alloc(&rank);
+    if(status != 0) {
+        printk("Unable to get rank!\n");
+        return; 
+    } 
+  
+  status = dpu_reset_rank(rank); 
+    
+    if(status != 0) {
+	printk("DPU reset rank failed, err code: %d\n", status);
+	return;
+    } 
+   
+    
+    printk("Got rank!\n");
+
 }
 
 /*
@@ -242,11 +258,11 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
 				struct page *page) {
     
     uint8_t dpu_index, rank_index; 
-    struct dpu_rank_t *rank; 
     void * src;
     uint32_t page_id; 
     struct allocated_dpu_page_node *current_node = rank_0; 
     int status;
+    struct dpu_t *dpu; 
     // Get the rank using the hash function.
     rank_index = RANK_INDEX_FROM_OFFSET(offset);
 
@@ -269,16 +285,19 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
     printk("Found page to support\n");
 
     // We will try to support all dpus.
-    status = dpu_rank_alloc(&rank);
-    if(status != 0) {
+    // status = dpu_rank_alloc(&rank);
+    /* if(status != 0) {
         printk("Unable to get rank!\n");
         return -1; 
-     }
-
+     } */
+	int nb_dpus = dpu_get_number_of_dpus_for_rank(rank);
+	printk("Number of dpus is %d\n", nb_dpus);
      // Get 0 dpu.
-    dpu = dpu_get(rank, 0, 0);
+    dpu = dpu_get(rank, 1, 1);
 
+    printk("Value of dpu is %p\n", dpu);
     src = kmap_atomic(page);
+    printk("kmap atomic succeeded\n");
     // src contains the data to copy. 
     // Go to the next free offset.
     while(current_node->next != NULL) {
@@ -300,19 +319,22 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
     current_node->sz -= 4096;
 
     if(new_node->offset_in_mram == 0) 
-        rank_0 = new_node; 
-    
-    // TODO - write dpu code here. 
-    status = dpu_copy_to_wram_for_dpu(dpu, 0x1000, src, 4096/32);
+        rank_0 = new_node;
+
+  uint8_t ci_id = 0; 
+  uint8_t dpu_id = 0; 
+  uint64_t id = ((uint64_t)ci_id) << 32 | dpu_id;
+   
+    status = dpu_copy_to_wram_for_dpu(dpu, 0x1000/4, (uint32_t *)&id , 2);
 
     if(status != 0) {
-        printk("DPU wram copy didn't work\n");
+        printk("DPU wram copy didn't work err code: %d\n", status);
         kunmap_atomic(src);
         return -1;
-    }
-
+    } 
+    printk("Copy worked\n");
     kunmap_atomic(src);
-    return 0; 
+    return -1; 
 }
 
 /** Load a compressed page (swap in)

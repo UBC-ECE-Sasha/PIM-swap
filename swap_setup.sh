@@ -16,8 +16,8 @@ SWAP_IMAGE="swap-1g.raw"
 qemu-img create -f raw "${SWAP_IMAGE}" 1G
 
 # image must be o=rw- on UPMEM servers
-chmod 666 "${SWAP_IMAGE}"
-chown $USER:$USER "${SWAP_IMAGE}"
+#chmod 666 "${SWAP_IMAGE}"
+#chown $USER:$USER "${SWAP_IMAGE}"
 
 loop_dev=$(losetup -f)
 if [ -z "${loop_dev}" ]; then
