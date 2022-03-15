@@ -1,4 +1,11 @@
 #!/bin/bash
+
+# command line options defaults
+MEM_LIMIT="4096" # memory limit of test
+TIMEOUT="0" # in seconds
+TEST_CONFIG="none"
+RAM_DISK_SIZE="24576"
+
 clear_ramdisk () {
     rm -f /mnt/ramdisk/testfile
 }
@@ -22,32 +29,49 @@ specify_memory () {
     cat /proc/meminfo
 }
 
+print_usage() {
+  echo "usage: $0 [-i pathtohostfile] [-g pathtoguestfile] [-m memorymb] [-c simulatedcores] [-d pathtodiskimg] [-t timeout(s)] [-e] [-k]"
+  echo "-c config file: wtperf config to use for tests"
+  echo "-m memorymb: memory in MB left for program (default: ${MEM_LIMIT})"
+  echo "-t timeout(s): test timeout in seconds with 0 for no timeout (default: ${TIMEOUT})"
+  echo "-h: print this message"
+  echo "read more at https://wiki.ubc.ca/PIM-SWAP"
+}
+
+while getopts 'c:m:t:h' flag; do
+  case "${flag}" in
+    c) TEST_CONFIG="${OPTARG}" ;;
+    m) MEM_LIMIT="${OPTARG}" ;;
+    t) TIMEOUT="${OPTARG}" ;;
+    h) print_usage
+       exit 1 ;;
+    *) print_usage
+       exit 1 ;;
+  esac
+done
+
 clear_ramdisk
 
 cd wiredtiger/build_posix/bench/wtperf
-mount -t ramfs -o size=16GB ext4 /mnt/ramdisk
+mount -t ramfs -o size=${RAMDISK_SIZE}MB ext4 /mnt/ramdisk
 
-M_TARGET=24576
-for i in {1..8}
-do
-    MEM_AVAIL_KB=$(cat /proc/meminfo | grep MemAvailable | awk '{print $2}')
-    MEM_AVAIL_MB=$((MEM_AVAIL_KB/1024))
+MEM_AVAIL_KB=$(cat /proc/meminfo | grep MemAvailable | awk '{print $2}')
+MEM_AVAIL_MB=$((MEM_AVAIL_KB/1024))
 
-    LOG_DIR="../../../../logs/WT_YCSB_Ca_${M_TARGET}_$(date '+%Y-%m-%d--%H-%M-%S')"
-    mkdir $LOG_DIR
-    specify_memory $M_TARGET $MEM_AVAIL_MB
+LOG_DIR="../../../../logs/WT_YCSB_Ca_${MEM_LIMIT}_$(date '+%Y-%m-%d--%H-%M-%S')"
+mkdir $LOG_DIR
+specify_memory $MEM_LIMIT $MEM_AVAIL_MB
 
-    ./../../../../log_mem.sh > $LOG_DIR/sys.log 2>&1 &
-    MEMLOG_PID=$!
+./../../../../log_mem.sh > $LOG_DIR/sys.log 2>&1 &
+MEMLOG_PID=$!
 
-    ./wtperf -O ../../../bench/wtperf/runners/ycsb-ca.wtperf
+./wtperf -O ../../../bench/wtperf/runners/ycsb-ca.wtperf
 
-    kill $MEMLOG_PID
+kill $MEMLOG_PID
 
-    cp WT_TEST/monitor $LOG_DIR
-    cp WT_TEST/test.stat $LOG_DIR
+cp WT_TEST/monitor $LOG_DIR
+cp WT_TEST/test.stat $LOG_DIR
 
-    clear_ramdisk
-    sleep 1
-done
+clear_ramdisk
+
 
