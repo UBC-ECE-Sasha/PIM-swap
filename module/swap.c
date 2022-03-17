@@ -45,8 +45,11 @@ typedef struct page_descriptor {
 } page_descriptor;
 
 // Kernel datastructures for dpus.
-static struct dpu_rank_t *rank; 
+static struct dpu_rank_t *rank;
+static uint64_t out_buffer_bmp;
 static struct dpu_t *dpu;
+static page_descriptor inbuffer[MAX_NR_DPUS_PER_RANK]; // coming from DPU.
+static page_descriptor outbuffer[MAX_NR_DPUS_PER_RANK]; // going to DPU. 
 
 /*int lzo_decompress_main(void)
 {
@@ -238,7 +241,12 @@ static void pimswap_frontswap_init(unsigned type)
 	printk("DPU reset rank failed, err code: %d\n", status);
 	return;
     } 
-   
+    
+    out_buffer_bmp = 0; 
+
+    for(int i = 0; i < MAX_NR_DPUS_PER_RANK; i++) {
+        outbuffer[i].id = 0;
+    }
     
     printk("Got rank!\n");
 
@@ -263,6 +271,7 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
     struct allocated_dpu_page_node *current_node = rank_0; 
     int status;
     struct dpu_t *dpu; 
+    struct dpu_transfer_mram xfer; 
     // Get the rank using the hash function.
     rank_index = RANK_INDEX_FROM_OFFSET(offset);
 
@@ -290,49 +299,80 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
         printk("Unable to get rank!\n");
         return -1; 
      } */
-	int nb_dpus = dpu_get_number_of_dpus_for_rank(rank);
-	printk("Number of dpus is %d\n", nb_dpus);
-     // Get 0 dpu.
-    dpu = dpu_get(rank, 1, 1);
+    // Does page exist? 
+    
+    if(out_buffer_bmp & (1ULL<<dpu_index)) {
+        printk("Pushing the pages\n");
+        int nb_dpus = dpu_get_number_of_dpus_for_rank(rank);
+    
+        printk("Number of dpus is %d\n", nb_dpus);
+        for(int i = 0; i < nb_dpus; i++) {
+            int ci_id = i / 8; 
+            int dpu_id = i % 8;
 
-    printk("Value of dpu is %p\n", dpu);
-    src = kmap_atomic(page);
-    printk("kmap atomic succeeded\n");
-    // src contains the data to copy. 
-    // Go to the next free offset.
-    while(current_node->next != NULL) {
-        current_node = current_node->next; 
+            if(outbuffer[i].id != 0) {
+                struct dpu_t *dpu = dpu_get(rank, ci_id, dpu_id);
+                dpu_transfer_matrix_add_dpu(dpu, &xfer, outbuffer[i].data);
+                outbuffer[i].id = 0;
+            }
+        }
+
+        printk("Transferring to dpus\n");
+        status = dpu_copy_to_mrams(rank, &xfer, sizeof(page_descriptor), 0);
+
+        if(status != 0) {
+            printk("Failed to copy to MRAM\n");
+            return -1;
+        }
+
+        printk("Successfully copied to MRAM\n");
+        out_buffer_bmp = 0;
+        
     }
+   // Page doesn't exist.
+    out_buffer_bmp |= (1ULL << dpu_index);
+    src = kmap_atomic(page);
 
-    if(current_node->offset_in_mram == 64*1024*1024) 
-        return -1; 
+    memcpy(outbuffer[dpu_index].data, src, PAGE_SIZE);
 
-    int mram_offset = current_node->offset_in_mram; 
+    outbuffer[dpu_index].id = ID_FROM_OFFSET(offset) | PAGE_VALID;
+ //   src = kmap_atomic(page);
+ //   printk("kmap atomic succeeded\n");
+ //   // src contains the data to copy. 
+ //   // Go to the next free offset.
+ //   while(current_node->next != NULL) {
+ //       current_node = current_node->next; 
+ //   }
 
-    struct allocated_dpu_page_node *new_node = vmalloc(sizeof(struct allocated_dpu_page_node));
+ //   if(current_node->offset_in_mram == 64*1024*1024) 
+ //       return -1; 
 
-    new_node->offset_in_mram = current_node->offset_in_mram;
-    new_node->sz = 4096; 
-    new_node->page = NULL; 
-    new_node->next = current_node; 
-    current_node->offset_in_mram += 4096; 
-    current_node->sz -= 4096;
+ //   int mram_offset = current_node->offset_in_mram; 
 
-    if(new_node->offset_in_mram == 0) 
-        rank_0 = new_node;
+ //   struct allocated_dpu_page_node *new_node = vmalloc(sizeof(struct allocated_dpu_page_node));
 
-  uint8_t ci_id = 0; 
-  uint8_t dpu_id = 0; 
-  uint64_t id = ((uint64_t)ci_id) << 32 | dpu_id;
-   
-    status = dpu_copy_to_wram_for_dpu(dpu, 0x1000/4, (uint32_t *)&id , 2);
+ //   new_node->offset_in_mram = current_node->offset_in_mram;
+ //   new_node->sz = 4096; 
+ //   new_node->page = NULL; 
+ //   new_node->next = current_node; 
+ //   current_node->offset_in_mram += 4096; 
+ //   current_node->sz -= 4096;
 
-    if(status != 0) {
-        printk("DPU wram copy didn't work err code: %d\n", status);
-        kunmap_atomic(src);
-        return -1;
-    } 
-    printk("Copy worked\n");
+ //   if(new_node->offset_in_mram == 0) 
+ //       rank_0 = new_node;
+
+ //   uint8_t ci_id = 0; 
+ //   uint8_t dpu_id = 0; 
+ //   uint64_t id = ((uint64_t)ci_id) << 32 | dpu_id;
+ //  
+ //   status = dpu_copy_to_wram_for_dpu(dpu, 0x1000/4, (uint32_t *)&id , 2);
+
+ //   if(status != 0) {
+ //       printk("DPU wram copy didn't work err code: %d\n", status);
+ //       kunmap_atomic(src);
+ //       return -1;
+ //   } 
+ //   printk("Copy worked\n");
     kunmap_atomic(src);
     return -1; 
 }
