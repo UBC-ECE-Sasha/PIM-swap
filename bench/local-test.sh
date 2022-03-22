@@ -7,12 +7,12 @@ TEST_CONFIG="none"
 RAMDISK_SIZE="24576"
 
 clear_ramdisk () {
-    rm -f /mnt/ramdisk/testfile
+    rm -f /scratch/ramdisk/testfile
 }
 
 # pass in MB to fill ramdisk testfile with
 fill_ramdisk () {
-    dd < /dev/zero bs=1048576 count=$1 > /mnt/ramdisk/testfile
+    dd < /dev/zero bs=1048576 count=$1 > /scratch/ramdisk/testfile
 }
 
 specify_memory () {
@@ -50,20 +50,18 @@ while getopts 'c:m:t:h' flag; do
   esac
 done
 
+mkdir /scratch/ramdisk
 clear_ramdisk
 
-cd wiredtiger/build_posix/bench/wtperf
-mount -t ramfs -o size=${RAMDISK_SIZE}MB ext4 /mnt/ramdisk
+mount -t ramfs -o size=${RAMDISK_SIZE}MB ext4 /scratch/ramdisk
 
 MEM_AVAIL_KB=$(cat /proc/meminfo | grep MemAvailable | awk '{print $2}')
 MEM_AVAIL_MB=$((MEM_AVAIL_KB/1024))
 
 specify_memory $MEM_LIMIT $MEM_AVAIL_MB
 
+# TODO check name of config 
 ./wtperf-test.sh $TEST_CONFIG
-
-cp WT_TEST/monitor $LOG_DIR
-cp WT_TEST/test.stat $LOG_DIR
 
 clear_ramdisk
 
