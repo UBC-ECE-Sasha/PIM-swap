@@ -4,7 +4,7 @@
 MEM_LIMIT="4096" # memory limit of test
 TIMEOUT="0" # in seconds
 TEST_CONFIG="none"
-RAM_DISK_SIZE="24576"
+RAMDISK_SIZE="24576"
 
 clear_ramdisk () {
     rm -f /mnt/ramdisk/testfile
@@ -58,16 +58,9 @@ mount -t ramfs -o size=${RAMDISK_SIZE}MB ext4 /mnt/ramdisk
 MEM_AVAIL_KB=$(cat /proc/meminfo | grep MemAvailable | awk '{print $2}')
 MEM_AVAIL_MB=$((MEM_AVAIL_KB/1024))
 
-LOG_DIR="../../../../logs/WT_YCSB_Ca_${MEM_LIMIT}_$(date '+%Y-%m-%d--%H-%M-%S')"
-mkdir $LOG_DIR
 specify_memory $MEM_LIMIT $MEM_AVAIL_MB
 
-./../../../../log_mem.sh > $LOG_DIR/sys.log 2>&1 &
-MEMLOG_PID=$!
-
-./wtperf -O ../../../bench/wtperf/runners/ycsb-ca.wtperf
-
-kill $MEMLOG_PID
+./wtperf-test.sh $TEST_CONFIG
 
 cp WT_TEST/monitor $LOG_DIR
 cp WT_TEST/test.stat $LOG_DIR
