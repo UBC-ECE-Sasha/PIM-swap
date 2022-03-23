@@ -42,7 +42,7 @@ run_test() {
     LOG_DIR="../../../../logs/WT_YCSB_C_10m_16G_$(date '+%Y-%m-%d--%H-%M-%S')"
     mkdir $LOG_DIR
 
-    ./$BENCH_DIR/log_mem.sh > $LOG_DIR/sys.log 2>&1 &
+    ./$BENCH_DIR/log-mem.sh > $LOG_DIR/sys.log 2>&1 &
     MEMLOG_PID=$!
 
     ./wtperf -O ../../../bench/wtperf/runners/ycsb-c_10m_16G.wtperf

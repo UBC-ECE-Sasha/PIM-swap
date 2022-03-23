@@ -8,7 +8,7 @@ LOG_DIR="logs/WT_${CONFIG_BASENAME}_$(date '+%Y-%m-%d--%H-%M-%S')"
 mkdir $LOG_DIR
 echo $LOG_DIR
 
-./log_mem.sh > $LOG_DIR/sys.log 2>&1 &
+./log-mem.sh > $LOG_DIR/sys.log 2>&1 &
 MEMLOG_PID=$!
 
 $WTPERF_LOC/wtperf -O $CONFIG > $LOG_DIR/wt_out.log 2>&1 &
