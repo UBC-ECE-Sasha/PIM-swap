@@ -21,6 +21,24 @@ print_usage() {
   echo "read more at https://wiki.ubc.ca/PIM-SWAP"
 }
 
+while getopts 'd:m:p:s:cruh' flag; do
+  case "${flag}" in
+    d) RAMFS_DIR="${OPTARG}" ;;
+    m) MEMLEFT="${OPTARG}" ;;
+    s) RAMFS_SIZE="${OPTARG}" ;;
+    c) CMD_CLEAR="true" ;;
+    r) CMD_MOUNT="true" ;;
+    u) CMD_UNMOUNT="true" ;;
+    h) print_usage
+       exit 1 ;;
+    *) print_usage
+       exit 1 ;;
+  esac
+done
+
+MEM_AVAIL_KB=$(cat /proc/meminfo | grep MemAvailable | awk '{print $2}')
+MEM_AVAIL_MB=$((MEM_AVAIL_KB/1024))
+
 clear_ramdisk () {
     rm -f ${TESTFILE}
 }
@@ -34,7 +52,7 @@ specify_memory () {
     if [ $MEMLEFT -gt 0 ]; then  
         clear_ramdisk
 
-        FILL_MB=$((PREV_MEM_AVAIL-MEMLEFT))
+        FILL_MB=$((MEM_AVAIL_MB-MEMLEFT))
         if [ "$FILL_MB" -gt "0" ]; then
             echo fill $FILL_MB
             fill_ramdisk $FILL_MB
@@ -51,22 +69,6 @@ mount_ramdisk () {
 umount_ramdisk () {
     umount ${RAMFS_DIR}
 }
-
-while getopts 'd:m:p:s:cruh' flag; do
-  case "${flag}" in
-    d) RAMFS_DIR="${OPTARG}" ;;
-    m) MEMLEFT="${OPTARG}" ;;
-    p) PREV_MEM_AVAIL="${OPTARG}" ;;
-    s) RAMFS_SIZE="${OPTARG}" ;;
-    c) CMD_CLEAR="true" ;;
-    r) CMD_MOUNT="true" ;;
-    u) CMD_UNMOUNT="true" ;;
-    h) print_usage
-       exit 1 ;;
-    *) print_usage
-       exit 1 ;;
-  esac
-done
 
 if [ $CMD_CLEAR == "true" ]; then
     clear_ramdisk
