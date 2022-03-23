@@ -24,7 +24,7 @@ MEM_AVAIL_MB=$((MEM_AVAIL_KB/1024))
 ./limit-mem.sh -d /scratch/ramdisk -m $MEM_LIMIT
 
 # TODO check name of config 
-./wtperf-test.sh $TEST_CONFIG
+./wtperf-test.sh $TEST_CONFIG ${MEM_LIMIT}M_
 
 clear_ramdisk
 
