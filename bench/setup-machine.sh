@@ -8,3 +8,5 @@ sudo apt-get install sysstat bc
 
 mkdir /scratch/db
 chmod 777 /scratch/db
+mkdir /scratch/ramdisk
+chmod 777 /scratch/ramdisk
