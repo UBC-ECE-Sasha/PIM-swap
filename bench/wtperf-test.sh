@@ -1,4 +1,8 @@
 #!/bin/bash
+#
+# 2022-03-21 J. Dagger (JacksonDDagger at gmail)
+#
+# Execute wtperf and log extra system statistics
 
 CONFIG=$1
 EXTRA_LOG_NAME=$2

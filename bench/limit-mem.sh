@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# 2021-11-30 J. Dagger
+# 2021-11-30 J. Dagger (JacksonDDagger at gmail)
 # 
-# Limit memory on system using ramfs
+# Limit memory on system using ramfs.
 
 RAMFS_DIR=/mnt/ramdisk
 TESTFILE=${RAMFS_DIR}/testfile

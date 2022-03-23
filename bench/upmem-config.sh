@@ -1,4 +1,6 @@
 #!/bin/bash
+#
+# 2021-11-24 J. Dagger (JacksonDDagger at gmail)
 
 WORK_DIR=/scratch/work
 mkdir -p "$WORK_DIR"

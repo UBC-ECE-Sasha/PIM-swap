@@ -1,4 +1,8 @@
 #!/bin/bash
+#
+# 2022-03-21 J. Dagger (JacksonDDagger at gmail)
+#
+# Benchmark workload on local machine.
 
 # command line options defaults
 MEM_LIMIT="4096" # memory limit of test
