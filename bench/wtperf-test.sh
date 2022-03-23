@@ -17,7 +17,7 @@ echo $LOG_DIR
 ./log-mem.sh > $LOG_DIR/sys.log 2>&1 &
 MEMLOG_PID=$!
 
-$WTPERF_LOC/wtperf -O $CONFIG -h $DB_DIR > $LOG_DIR/wt_out.log 2>&1 &
+perf record -F 1 -o $LOG_DIR/perf.data $WTPERF_LOC/wtperf -O $CONFIG -h $DB_DIR > $LOG_DIR/wt_out.log 2>&1 &
 WTPERF_PID=$!
 
 pidstat -p $WTPERF_PID -r -u 1 > $LOG_DIR/pidstat.log 2>&1
