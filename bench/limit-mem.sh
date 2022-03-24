@@ -5,7 +5,6 @@
 # Limit memory on system using ramfs.
 
 RAMFS_DIR=/mnt/ramdisk
-TESTFILE=${RAMFS_DIR}/testfile
 RAMFS_NUM=4
 RAMFS_DENOM=5
 RAMFS_SIZE=$((RAMFS_NUM*$(cat /proc/meminfo | grep MemTotal | awk '{print $2}')/RAMFS_DENOM/1024/1024))
@@ -36,6 +35,7 @@ while getopts 'd:m:p:s:cruh' flag; do
   esac
 done
 
+TESTFILE=${RAMFS_DIR}/testfile
 MEM_AVAIL_KB=$(cat /proc/meminfo | grep MemAvailable | awk '{print $2}')
 MEM_AVAIL_MB=$((MEM_AVAIL_KB/1024))
 
