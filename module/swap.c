@@ -243,8 +243,8 @@ static void pimswap_frontswap_init(unsigned type)
     } 
     
     out_buffer_bmp = 0; 
-
-    for(int i = 0; i < MAX_NR_DPUS_PER_RANK; i++) {
+    int i = 0;
+    for(i = 0; i < MAX_NR_DPUS_PER_RANK; i++) {
         outbuffer[i].id = 0;
     }
    
@@ -287,7 +287,7 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
         return -1; 
     }
 
-    if(dpu_index != 0) {
+    if(dpu_index != 1) {
         printk("ERROR: dpu %u doesn't exist!\n", dpu_index);
         return -1; 
     }
@@ -307,7 +307,8 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
         int nb_dpus = dpu_get_number_of_dpus_for_rank(rank);
     
         printk("Number of dpus is %d\n", nb_dpus);
-        for(int i = 0; i < nb_dpus; i++) {
+	int i = 0;
+        for(i = 0; i < nb_dpus; i++) {
             int ci_id = i / 8; 
             int dpu_id = i % 8;
 
@@ -315,11 +316,11 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
                 struct dpu_t *dpu = dpu_get(rank, ci_id, dpu_id);
                 dpu_transfer_matrix_add_dpu(dpu, &xfer, outbuffer[i].data);
                 outbuffer[i].id = 0;
+		printk("Added to transfer\n");
             }
         }
-
-        printk("Transferring to dpus\n");
-        status = dpu_copy_to_mrams(rank, &xfer, sizeof(page_descriptor), 0);
+	printk("Transferring to dpus\n");
+        status = dpu_copy_to_mrams(rank, &xfer, PAGE_SIZE, 0);
 
         if(status != 0) {
             printk("Failed to copy to MRAM\n");
