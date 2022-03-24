@@ -14,7 +14,7 @@ LOG_DIR="logs/WT_${CONFIG_BASENAME}_${EXTRA_LOG_NAME}$(date '+%Y-%m-%d--%H-%M-%S
 mkdir $LOG_DIR
 echo $LOG_DIR
 
-./log-mem.sh > $LOG_DIR/sys.log 2>&1 &
+vmstat -t 1 > $LOG_DIR/vmstat.log 2>&1 &
 MEMLOG_PID=$!
 
 perf record -F 1 -o $LOG_DIR/perf.data $WTPERF_LOC/wtperf -O $CONFIG -h $DB_DIR > $LOG_DIR/wt_out.log 2>&1 &
