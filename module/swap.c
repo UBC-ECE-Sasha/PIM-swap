@@ -49,7 +49,7 @@ static struct dpu_rank_t *rank;
 static uint64_t out_buffer_bmp;
 static struct dpu_t *dpu;
 static page_descriptor inbuffer[MAX_NR_DPUS_PER_RANK]; // coming from DPU.
-static page_descriptor outbuffer[MAX_NR_DPUS_PER_RANK]; // going to DPU. 
+static page_descriptor *outbuffer; // going to DPU. 
 
 /*int lzo_decompress_main(void)
 {
@@ -247,7 +247,8 @@ static void pimswap_frontswap_init(unsigned type)
     for(int i = 0; i < MAX_NR_DPUS_PER_RANK; i++) {
         outbuffer[i].id = 0;
     }
-    
+   
+    outbuffer = vmalloc(sizeof(struct page_descriptor) * MAX_NR_DPUS_PER_RANK); 
     printk("Got rank!\n");
 
 }
