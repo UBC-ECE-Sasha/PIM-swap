@@ -14,3 +14,4 @@
 /bench/wiredtiger/
 /bench/local_logs/
 /bench/WT_TEST/
+*perf.data

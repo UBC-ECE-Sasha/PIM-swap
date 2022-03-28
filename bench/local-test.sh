@@ -2,7 +2,7 @@
 #
 # 2022-03-21 J. Dagger (JacksonDDagger at gmail)
 #
-# Benchmark workload on local machine.
+# Benchmark workload on local machine with memory limits.
 
 # command line options defaults
 MEM_LIMIT="4096" # memory limit of test
