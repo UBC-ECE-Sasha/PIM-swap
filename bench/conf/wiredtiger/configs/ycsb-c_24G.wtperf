@@ -1,9 +1,10 @@
-conn_config="cache_size=8G,log=(enabled=true)"
+conn_config="cache_size=24G,log=(enabled=true)"
 pareto=20
 table_config="type=file"
 key_sz=100
 value_sz=1024
-icount=40000000
+icount=120000000
+run_time=3600
 threads=((count=20,reads=1))
 warmup=120
 sample_interval=5
