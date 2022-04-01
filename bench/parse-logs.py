@@ -18,12 +18,36 @@ def main():
     for logdir in args.logDirs:
         if not isinstance(logdir, Path):
             logdir = Path(logdir)
-        df = read_log(logdir, cropSetup=args.cropSetup)
+        df = read_log(logdir, fullRun=args.fullRun)
         if args.summarize:
-            print(df.describe())
+            sys_cols = [
+                "memory swapped in /s",
+                "memory swapped out /s",
+                "virt_mem_used",
+                "majflt/s",
+                "minflt/s",
+                "VSZ",
+                "RSS"
+            ]
+            if "WT" in logdir.stem:
+                if "ycsb-a" in logdir.stem:
+                    app_cols = [
+                        "wtperf.read.ops per sec",
+                        "wtperf.read.average latency",
+                        "wtperf.update.ops per sec",
+                        "wtperf.update.average latency"
+                    ]
+                else:
+                    app_cols = [
+                        "wtperf.read.ops per sec",
+                        "wtperf.read.average latency"
+                    ]
+            else:
+                app_cols = []
+            print(df[app_cols + sys_cols].describe().transpose())
         df.to_csv(logdir / "output.csv")
 
-def read_log(logdir, cropSetup=True):
+def read_log(logdir, fullRun=False):
     """
     Reads the log files from a PIM-swap benchmark run and outputs a dataframe of the data.
 
@@ -49,7 +73,7 @@ def read_log(logdir, cropSetup=True):
         return None
     if application == "wiredtiger":
         app_log_path = logdir / "monitor.json"
-        app_log = read_wtperf_log(app_log_path)
+        app_log = read_wtperf_log(app_log_path, cropSetup=not fullRun)
         app_log.index = app_log.index.round("1s")
 
     pidstat_path = logdir / "pidstat.log"
@@ -63,7 +87,7 @@ def read_log(logdir, cropSetup=True):
     # resample application df to 1 second
     freq = pd.infer_freq(df.index)
     app_log = app_log.resample(freq).bfill()
-    if cropSetup:
+    if not fullRun:
         df = df.loc[app_log.index[0]:]
     df = df.join(app_log, how="outer")
 
@@ -77,12 +101,16 @@ def read_wtperf_log(fname, cropSetup=True):
     monitor_df["localTime"] = pd.to_datetime(monitor_df["localTime"], utc=True)
     monitor_df.set_index("localTime", inplace=True)
     if cropSetup:
-        ops_cols = [col for col in monitor_df.columns if "ops per sec" in col]
-        non_se_ops_cols = [col for col in ops_cols if "insert" not in col]
-        first_appears = [monitor_df[col].ne(0).idxmax() for col in non_se_ops_cols if monitor_df[col].ne(0).nunique()>1]
-        start = min(first_appears)
+        start = find_wtperf_start(monitor_df)
         monitor_df = monitor_df.loc[start:]
     return monitor_df
+
+def find_wtperf_start(monitor_df):
+    ops_cols = [col for col in monitor_df.columns if "ops per sec" in col]
+    non_se_ops_cols = [col for col in ops_cols if "insert" not in col]
+    first_appears = [monitor_df[col].ne(0).idxmax() for col in non_se_ops_cols if monitor_df[col].ne(0).nunique()>1]
+    start = min(first_appears)
+    return start
 
 def read_pidstat(fname):
     f = open(fname, "r")
@@ -167,8 +195,8 @@ def parse_args():
         nargs='+',
         help="Log directories to read from."
         )
-    parser.add_argument("--cropSetup", "-c", action="store_true",
-        help="Crop the data to start when the real workload starts.")
+    parser.add_argument("--fullRun", "-f", action="store_true",
+        help="Don't crop the data to start when the real workload starts.")
     parser.add_argument("--summarize", "-s", action="store_true",
         help="Print summary statistics of dataframe.")
     args = parser.parse_args()
