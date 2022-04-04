@@ -4,6 +4,7 @@
 #
 # Log the system and given process with pidstat, vmstat and perf.
 # Automatically terminates when given PID terminates.
+# Usage: ./process-log.sh [PID] [LOG_DIR]
 
 PID=$1
 LOG_DIR=$2

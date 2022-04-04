@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# 2021-11-30 J. Dagger (JacksonDDagger at gmail)
+# 2022-03-23 J. Dagger (JacksonDDagger at gmail)
 #
 # Setup fresh server for PIM-swap benchmarking.
 

@@ -3,6 +3,7 @@
 # 2022-03-21 J. Dagger (JacksonDDagger at gmail)
 #
 # Execute wtperf and log extra system statistics.
+# Usage: ./wtperf-test.sh [TEST_CONFIG] [MEM_LIMIT]
 
 CONFIG=$1
 EXTRA_LOG_NAME=$2

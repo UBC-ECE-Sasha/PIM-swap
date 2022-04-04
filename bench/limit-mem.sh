@@ -3,6 +3,7 @@
 # 2021-11-30 J. Dagger (JacksonDDagger at gmail)
 # 
 # Limit memory on system using ramfs.
+# Script assumes ramfs is already mounted unless -r is specified.
 
 RAMFS_DIR=/mnt/ramdisk
 RAMFS_NUM=4
@@ -15,7 +16,12 @@ CMD_UNMOUNT="false"
 CMD_CLEAR="false"
 
 print_usage() {
-  echo "uh oh, Jackson hasn't made this yet"
+  echo "-d: ramfs directory"
+  echo "-m: specify memory limit in MB"
+  echo "-s: specify size of ramfs in MB (default will be slightly bigger than needed)"
+  echo "-c: clear ramfs"
+  echo "-r: mount ramdisk"
+  echo "-u: unmount ramdisk"
   echo "-h: print this message"
   echo "read more at https://wiki.ubc.ca/PIM-SWAP"
 }
