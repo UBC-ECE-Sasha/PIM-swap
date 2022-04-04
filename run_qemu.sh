@@ -8,7 +8,6 @@
 # modprobe pim_swap
 
 ROOT=buildroot
-
 RAM_SIZE=100
 id=0
 NR_RANKS=1
@@ -28,12 +27,12 @@ while [ $id -lt $NR_RANKS ]; do
 done
 
 MAX_MEM=$((RAM_SIZE + 8192*NR_RANKS))
-
-qemu-system-x86_64 -M q35 -enable-kvm \
+ 
+qemu-system-x86_64 -s -S -M q35 -enable-kvm \
  -m ${RAM_SIZE}M,slots=$NR_SLOTS,maxmem=${MAX_MEM}M $MAPPING_OPTIONS \
- -kernel output/images/bzImage \
- -initrd output/images/rootfs.cpio.gz \
+ -kernel  output/build/linux-5.4.95/arch/x86_64/boot/bzImage \
  -append "rootwait root=/dev/vda console=ttyS0 nokaslr memmap=2G!4G" \
+ -initrd output/images/rootfs.cpio.gz \
  -cpu host \
  -usb \
  -chardev pty,id=ser0 \

@@ -7,7 +7,7 @@ ccflags-y += -I$(PWD)/../upmem_driver-2021.3.0/mappings/fpga_aws
 ccflags-y += -I$(PWD)/../upmem_driver-2021.3.0/mappings/fpga_kc705
 ccflags-y += -I$(PWD)/../upmem_driver-2021.3.0/mappings/power9
 ccflags-y += -I$(PWD)/../upmem_driver-2021.3.0/mappings/xeon_sp
-
+ccflags-y += -O0
 
 obj-m := pim_swap.o ../upmem_driver-2021.3.0/modules/
 pim_swap-y := swap.o 
@@ -41,7 +41,7 @@ ifeq ($(KERNELRELEASE),)
 KDIR ?= /usr/src/linux-headers-`uname -r`
 
 default:
-	make -C $(KDIR) M=$$PWD 
+	make -C $(KDIR) M=$$PWD  
 endif # KERNELRELEASE
 
 clean:

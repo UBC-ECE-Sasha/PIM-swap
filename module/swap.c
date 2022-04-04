@@ -244,11 +244,11 @@ static void pimswap_frontswap_init(unsigned type)
     
     out_buffer_bmp = 0; 
     int i = 0;
+    outbuffer = vmalloc(sizeof(struct page_descriptor) * MAX_NR_DPUS_PER_RANK); 
     for(i = 0; i < MAX_NR_DPUS_PER_RANK; i++) {
         outbuffer[i].id = 0;
     }
    
-    outbuffer = vmalloc(sizeof(struct page_descriptor) * MAX_NR_DPUS_PER_RANK); 
     printk("Got rank!\n");
 
 }
@@ -272,7 +272,7 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
     struct allocated_dpu_page_node *current_node = rank_0; 
     int status;
     struct dpu_t *dpu; 
-    struct dpu_transfer_mram xfer; 
+    struct dpu_transfer_mram *xfer; 
     // Get the rank using the hash function.
     rank_index = RANK_INDEX_FROM_OFFSET(offset);
 
@@ -280,7 +280,9 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
     dpu_index = DPU_INDEX_FROM_OFFSET(offset); 
 
     page_id = ID_FROM_OFFSET(offset);
-    
+   
+    if(page == NULL) 
+	   return -1;  
     // TODO - for now stick to rank 0.
     if(rank_index != 0) {
         printk("ERROR: rank %u doesn't exist!\n", rank_index);
@@ -305,7 +307,8 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
     if(out_buffer_bmp & (1ULL<<dpu_index)) {
         printk("Pushing the pages\n");
         int nb_dpus = dpu_get_number_of_dpus_for_rank(rank);
-    
+	// TODO: Possible Infinite loop here, preallocate.
+   	xfer = vmalloc(sizeof(struct dpu_transfer_mram)); 
         printk("Number of dpus is %d\n", nb_dpus);
 	int i = 0;
         for(i = 0; i < nb_dpus; i++) {
@@ -314,18 +317,20 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
 
             if(outbuffer[i].id != 0) {
                 struct dpu_t *dpu = dpu_get(rank, ci_id, dpu_id);
-                dpu_transfer_matrix_add_dpu(dpu, &xfer, outbuffer[i].data);
+		uint64_t data = 42;
+                dpu_transfer_matrix_add_dpu(dpu, xfer, data);
                 outbuffer[i].id = 0;
 		printk("Added to transfer\n");
             }
         }
 	printk("Transferring to dpus\n");
-        status = dpu_copy_to_mrams(rank, &xfer, PAGE_SIZE, 0);
-
+	uint64_t word = 42; 
+        // status = dpu_copy_to_wram_for_rank(rank, 0x1000/4, (uint32_t*)&word , 2);
+	status = dpu_copy_to_mrams(rank, xfer, sizeof(uint64_t) , 0);
         if(status != 0) {
             printk("Failed to copy to MRAM\n");
             return -1;
-        }
+        } 
 
         printk("Successfully copied to MRAM\n");
         out_buffer_bmp = 0;
