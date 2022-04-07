@@ -318,9 +318,10 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
             if(outbuffer[i].id != 0) {
                 struct dpu_t *dpu = dpu_get(rank, ci_id, dpu_id);
 		        uint64_t data = 42;
-                dpu_transfer_matrix_add_dpu(dpu, xfer, outbuffer[i].data);
-                outbuffer[i].id = 0;
-		printk("Added to transfer\n");
+                // dpu_transfer_matrix_add_dpu(dpu, xfer, outbuffer[i].data);
+                dpu_transfer_matrix_add_dpu(dpu, xfer, data);
+                // outbuffer[i].id = 0;
+		        printk("Added to transfer\n");
             }
         }
 	    printk("Transferring to dpus\n");
@@ -333,6 +334,26 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
         } 
 
         printk("Successfully copied to MRAM\n");
+
+        printk("Checking values\n");
+
+        for(i = 0; i < nb_dpus; i++) {
+            int ci_id = i/8; 
+            int dpu_id = i % 8; 
+
+            if(outbuffer[i].id != 0) {
+                dpu = dpu_get(rank, ci_id, dpu_id);
+                uint64_t number;
+                status = dpu_copy_from_mram(dpu, (uint8_t *)&number, 0, sizeof(uint64_t));
+                if(status != 0) {
+                    printk("Copy failed\n");
+                    return -1; 
+                }
+
+                printk("Number is %llu\n", number);
+            }
+        }
+
         out_buffer_bmp = 0;
         
     }
