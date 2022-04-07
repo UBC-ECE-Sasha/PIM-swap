@@ -17,6 +17,7 @@
 #define RANK_INDEX_FROM_OFFSET(_offset) ((uint8_t)(_offset >> 24))
 #define PAGE_VALID 0x80000000
 
+
 // command to select the DPU function
 enum {
 	COMMAND_STORE,
@@ -32,11 +33,11 @@ enum {
 struct allocated_dpu_page_node {
     int offset_in_mram;
     int sz; 
-    struct page_descriptor *page;
+    int id;
     struct allocated_dpu_page_node* next; 
 };
 
-
+static struct allocated_dpu_page_node *head, *curr;
 struct dpu_transfer_mram *xfer; 
 struct allocated_dpu_page_node *rank_0;
 
@@ -282,7 +283,7 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
     dpu_index = DPU_INDEX_FROM_OFFSET(offset); 
 
     page_id = ID_FROM_OFFSET(offset);
-   
+     
     if(page == NULL) 
 	   return -1;  
     // TODO - for now stick to rank 0.
@@ -298,62 +299,44 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
 
     printk("Found page to support\n");
 
-    // We will try to support all dpus.
-    // status = dpu_rank_alloc(&rank);
-    /* if(status != 0) {
-        printk("Unable to get rank!\n");
-        return -1; 
-     } */
-    // Does page exist? 
-    
     if(out_buffer_bmp & (1ULL<<dpu_index)) {
         printk("Pushing the pages\n");
         int nb_dpus = dpu_get_number_of_dpus_for_rank(rank);
-	// TODO: Possible Infinite loop here, preallocate.
-        printk("Number of dpus is %d\n", nb_dpus);
-	int i = 0;
+	    int i = 0;
+        // TOOD(shaurp): This might be inefficient, change this.
         for(i = 0; i < nb_dpus; i++) {
             int ci_id = i / 8; 
             int dpu_id = i % 8;
 
             if(outbuffer[i].id != 0) {
                 struct dpu_t *dpu = dpu_get(rank, ci_id, dpu_id);
-		uint64_t data = 42;
-                // dpu_transfer_matrix_add_dpu(dpu, xfer, outbuffer[i].data);
-                dpu_transfer_matrix_add_dpu(dpu, xfer, &data);
-                // outbuffer[i].id = 0;
-		        printk("Added to transfer\n");
+                dpu_transfer_matrix_add_dpu(dpu, xfer, outbuffer[i].data);
+                struct allocated_dpu_page_node *new = vmalloc(sizeof(struct allocated_dpu_page_node));
+                new->id = outbuffer[i].id; 
+                new->next = NULL; 
+                new->offset_in_mram = offset;
+                new->sz = 4096;
+                if(head == NULL) {
+                    head = new;
+                    curr = new; 
+                } else {
+                    curr->next = new;
+                    curr = new; 
+                }
+                outbuffer[i].id = 0;
             }
         }
 	    printk("Transferring to dpus\n");
-	    uint64_t word = 42; 
-        // status = dpu_copy_to_wram_for_rank(rank, 0x1000/4, (uint32_t*)&word , 2);
-	    status = dpu_copy_to_mrams(rank, xfer, sizeof(uint64_t), 0);
+	    status = dpu_copy_to_mrams(rank, xfer, PAGE_SIZE, 0);
+        
         if(status != 0) {
             printk("Failed to copy to MRAM\n");
             return -1;
         } 
+        struct allocated_dpu_page_node *new = vmalloc(sizeof(struct allocated_dpu_page_node));
 
+        
         printk("Successfully copied to MRAM\n");
-
-        printk("Checking values\n");
-
-        for(i = 0; i < nb_dpus; i++) {
-            int ci_id = i/8; 
-            int dpu_id = i % 8; 
-
-            if(outbuffer[i].id != 0) {
-                dpu = dpu_get(rank, ci_id, dpu_id);
-                uint64_t number;
-                status = dpu_copy_from_mram(dpu, (uint8_t *)&number, 0, sizeof(uint64_t));
-                if(status != 0) {
-                    printk("Copy failed\n");
-                    return -1; 
-                }
-
-                printk("Number is %llu\n", number);
-            }
-        }
 
         out_buffer_bmp = 0;
         
@@ -365,45 +348,9 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
     memcpy(outbuffer[dpu_index].data, src, PAGE_SIZE);
 
     outbuffer[dpu_index].id = ID_FROM_OFFSET(offset) | PAGE_VALID;
- //   src = kmap_atomic(page);
- //   printk("kmap atomic succeeded\n");
- //   // src contains the data to copy. 
- //   // Go to the next free offset.
- //   while(current_node->next != NULL) {
- //       current_node = current_node->next; 
- //   }
-
- //   if(current_node->offset_in_mram == 64*1024*1024) 
- //       return -1; 
-
- //   int mram_offset = current_node->offset_in_mram; 
-
- //   struct allocated_dpu_page_node *new_node = vmalloc(sizeof(struct allocated_dpu_page_node));
-
- //   new_node->offset_in_mram = current_node->offset_in_mram;
- //   new_node->sz = 4096; 
- //   new_node->page = NULL; 
- //   new_node->next = current_node; 
- //   current_node->offset_in_mram += 4096; 
- //   current_node->sz -= 4096;
-
- //   if(new_node->offset_in_mram == 0) 
- //       rank_0 = new_node;
-
- //   uint8_t ci_id = 0; 
- //   uint8_t dpu_id = 0; 
- //   uint64_t id = ((uint64_t)ci_id) << 32 | dpu_id;
- //  
- //   status = dpu_copy_to_wram_for_dpu(dpu, 0x1000/4, (uint32_t *)&id , 2);
-
- //   if(status != 0) {
- //       printk("DPU wram copy didn't work err code: %d\n", status);
- //       kunmap_atomic(src);
- //       return -1;
- //   } 
- //   printk("Copy worked\n");
+    // Naive impl, store the offset into a list.
     kunmap_atomic(src);
-    return -1; 
+    return 0; 
 }
 
 /** Load a compressed page (swap in)
@@ -413,6 +360,52 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
 static int pimswap_frontswap_load(unsigned type, pgoff_t offset,
 				struct page *page)
 {
+    // Find the page offset and do mram read. 
+    uint8_t dpu_index, rank_index; 
+    void * src;
+    uint32_t page_id; 
+    struct allocated_dpu_page_node *current_node = rank_0; 
+    int status;
+    struct dpu_t *dpu;
+    int offset_in_mram = 0;
+    // Get the rank using the hash function.
+    rank_index = RANK_INDEX_FROM_OFFSET(offset);
+
+    // Get the dpu number using the hash function.
+    dpu_index = DPU_INDEX_FROM_OFFSET(offset); 
+
+    page_id = ID_FROM_OFFSET(offset);
+    
+    if(rank_index != 0) 
+        return -1; 
+    
+    if(dpu_index != 1) 
+        return -1; 
+
+    struct allocated_dpu_page_node *list = head; 
+    while(list != NULL) {
+        if(list->id == page_id) {
+            offset_in_mram = list->offset_in_mram;
+            break;
+        }
+        list = list->next;
+    }
+
+    if(list == NULL) 
+        return -1; 
+
+
+    // DPU_index is same as i here.
+    dpu = dpu_get(rank, dpu_index/8, dpu_index%8);
+
+    src = kmap_atomic(page);
+    status = dpu_copy_from_mram(dpu, src, offset_in_mram, PAGE_SIZE);
+    if(status != 0) {
+        printk("Read didn't work\n");
+        kunmap_atomic(src);
+        return -1; 
+    }
+    kunmap_atomic(src);
 	return 0;
 }
 
