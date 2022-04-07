@@ -33,11 +33,11 @@ enum {
 struct allocated_dpu_page_node {
     int offset_in_mram;
     int sz; 
-    int id;
+    uint32_t id;
     struct allocated_dpu_page_node* next; 
 };
 
-static struct allocated_dpu_page_node *head, *curr;
+static struct allocated_dpu_page_node *head = NULL, *curr = NULL;
 struct dpu_transfer_mram *xfer; 
 struct allocated_dpu_page_node *rank_0;
 static int mram_offset = 0;
@@ -230,7 +230,7 @@ static void pimswap_frontswap_init(unsigned type)
     rank_0 = vmalloc(sizeof(struct allocated_dpu_page_node));
     rank_0->offset_in_mram = 0; 
     rank_0->sz = 64*1024*1024;
-    rank_0->page = NULL;
+    // rank_0->page = NULL;
     rank_0->next = NULL;
   int status = dpu_rank_alloc(&rank);
     if(status != 0) {
@@ -316,7 +316,7 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
                 struct dpu_t *dpu = dpu_get(rank, ci_id, dpu_id);
                 dpu_transfer_matrix_add_dpu(dpu, xfer, outbuffer[i].data);
                 struct allocated_dpu_page_node *new = vmalloc(sizeof(struct allocated_dpu_page_node));
-                new->id = outbuffer[i].id; 
+                new->id = page_id; 
                 new->next = NULL; 
                 new->offset_in_mram = mram_offset;
                 new->sz = 4096;
@@ -369,7 +369,7 @@ static int pimswap_frontswap_load(unsigned type, pgoff_t offset,
     uint8_t dpu_index, rank_index; 
     void * src;
     uint32_t page_id; 
-    struct allocated_dpu_page_node *current_node = rank_0; 
+    // struct allocated_dpu_page_node *current_node = rank_0; 
     int status;
     struct dpu_t *dpu;
     int offset_in_mram = 0;
