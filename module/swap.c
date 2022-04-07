@@ -36,6 +36,8 @@ struct allocated_dpu_page_node {
     struct allocated_dpu_page_node* next; 
 };
 
+
+struct dpu_transfer_mram *xfer; 
 struct allocated_dpu_page_node *rank_0;
 
 typedef struct page_descriptor {
@@ -251,6 +253,7 @@ static void pimswap_frontswap_init(unsigned type)
    
     printk("Got rank!\n");
 
+   xfer = vmalloc(sizeof(struct dpu_transfer_mram)); 
 }
 
 /*
@@ -272,7 +275,6 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
     struct allocated_dpu_page_node *current_node = rank_0; 
     int status;
     struct dpu_t *dpu; 
-    struct dpu_transfer_mram *xfer; 
     // Get the rank using the hash function.
     rank_index = RANK_INDEX_FROM_OFFSET(offset);
 
@@ -308,7 +310,6 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
         printk("Pushing the pages\n");
         int nb_dpus = dpu_get_number_of_dpus_for_rank(rank);
 	// TODO: Possible Infinite loop here, preallocate.
-   	xfer = vmalloc(sizeof(struct dpu_transfer_mram)); 
         printk("Number of dpus is %d\n", nb_dpus);
 	int i = 0;
         for(i = 0; i < nb_dpus; i++) {
