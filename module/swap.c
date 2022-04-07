@@ -40,7 +40,7 @@ struct allocated_dpu_page_node {
 static struct allocated_dpu_page_node *head, *curr;
 struct dpu_transfer_mram *xfer; 
 struct allocated_dpu_page_node *rank_0;
-
+static int mram_offset = 0;
 typedef struct page_descriptor {
 	uint8_t data[PAGE_SIZE];
 	uint32_t id;	// page identifier - high bit is used as 'page valid'
@@ -275,7 +275,11 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
     uint32_t page_id; 
     struct allocated_dpu_page_node *current_node = rank_0; 
     int status;
-    struct dpu_t *dpu; 
+    struct dpu_t *dpu;
+
+    if(mram_offset >= 64*1024*1024) 
+        return -1;
+
     // Get the rank using the hash function.
     rank_index = RANK_INDEX_FROM_OFFSET(offset);
 
@@ -314,7 +318,7 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
                 struct allocated_dpu_page_node *new = vmalloc(sizeof(struct allocated_dpu_page_node));
                 new->id = outbuffer[i].id; 
                 new->next = NULL; 
-                new->offset_in_mram = offset;
+                new->offset_in_mram = mram_offset;
                 new->sz = 4096;
                 if(head == NULL) {
                     head = new;
@@ -324,6 +328,7 @@ static int pimswap_frontswap_store(unsigned type, pgoff_t offset,
                     curr = new; 
                 }
                 outbuffer[i].id = 0;
+                mram_offset += 4096; 
             }
         }
 	    printk("Transferring to dpus\n");
@@ -382,6 +387,7 @@ static int pimswap_frontswap_load(unsigned type, pgoff_t offset,
     if(dpu_index != 1) 
         return -1; 
 
+    printk("Loading a page from pimswap\n");
     struct allocated_dpu_page_node *list = head; 
     while(list != NULL) {
         if(list->id == page_id) {
@@ -405,6 +411,7 @@ static int pimswap_frontswap_load(unsigned type, pgoff_t offset,
         kunmap_atomic(src);
         return -1; 
     }
+    printk("Load successful!\n");
     kunmap_atomic(src);
 	return 0;
 }
