@@ -5,7 +5,7 @@ plot-logs.py
 
     Plot log file summaries from parse-logs.py.
     Includes a command line tool.
-    Can also be used by other code by calling from plot-logs import plot_outputs.
+    Can also be used by other code by calling `from plot-logs import plot_outputs`.
 """
 
 import argparse
@@ -80,7 +80,8 @@ def plot_outputs(df, savePath="output.png", title="", show=False, appPerf=True, 
     
     # various columns that may be in the dataframe
     appPerfCols = ["wtperf.read.ops per sec"]
-    memCols = ["VSZ", "RSS"]
+    # ADD APPLICATION HERE (STEP 7)
+    memCols = ["virt_mem_used", "VSZ", "RSS"]
     swapCols = ["memory swapped in /s", "memory swapped out /s"]
     faultCols = ["minflt/s", "majflt/s"]
 

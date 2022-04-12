@@ -4,7 +4,7 @@
 #
 # Setup fresh server for PIM-swap benchmarking.
 
-sudo apt-get install sysstat bc
+sudo apt-get install sysstat
 
 mkdir /scratch/db
 chmod 777 /scratch/db

@@ -11,7 +11,9 @@
 /.env
 /bench/logs/
 /bench/csvs/
+# ADD APPLICATION HERE (STEP 3)
 /bench/wiredtiger/
-/bench/local_logs/
 /bench/WT_TEST/
+
+/bench/local_logs/
 *perf.data

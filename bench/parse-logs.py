@@ -66,11 +66,14 @@ def read_log(logdir, fullRun=False):
     if not isinstance(logdir, Path):
         logdir = Path(logdir)
 
+    # ADD APPLICATION HERE (STEP 6)
     if "WT" in logdir.stem:
         application = "wiredtiger"
     else:
         print("Unknown log type: {}".format(logdir.stem))
         return None
+        
+    # ADD APPLICATION HERE (STEP 6)
     if application == "wiredtiger":
         app_log_path = logdir / "monitor.json"
         app_log = read_wtperf_log(app_log_path, cropSetup=not fullRun)
@@ -104,6 +107,8 @@ def read_wtperf_log(fname, cropSetup=True):
         start = find_wtperf_start(monitor_df)
         monitor_df = monitor_df.loc[start:]
     return monitor_df
+
+# ADD APPLICATION HERE (STEP 5)
 
 def find_wtperf_start(monitor_df):
     ops_cols = [col for col in monitor_df.columns if "ops per sec" in col]
