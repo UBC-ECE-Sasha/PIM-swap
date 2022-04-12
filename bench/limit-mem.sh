@@ -11,7 +11,7 @@ RAMFS_DENOM=5
 RAMFS_SIZE=$((RAMFS_NUM*$(cat /proc/meminfo | grep MemTotal | awk '{print $2}')/RAMFS_DENOM/1024/1024))
 MEMLEFT=0
 PREV_MEM_AVAIL=4096
-CMD_MOUNT="false"
+CMD_MOUNT="true"
 CMD_UNMOUNT="false"
 CMD_CLEAR="false"
 
@@ -20,7 +20,7 @@ print_usage() {
   echo "-m: specify memory limit in MB"
   echo "-s: specify size of ramfs in MB (default will be slightly bigger than needed)"
   echo "-c: clear ramfs"
-  echo "-r: mount ramdisk"
+  echo "-r: don't mount ramdisk"
   echo "-u: unmount ramdisk"
   echo "-h: print this message"
   echo "read more at https://wiki.ubc.ca/PIM-SWAP"
@@ -32,7 +32,7 @@ while getopts 'd:m:p:s:cruh' flag; do
     m) MEMLEFT="${OPTARG}" ;;
     s) RAMFS_SIZE="${OPTARG}" ;;
     c) CMD_CLEAR="true" ;;
-    r) CMD_MOUNT="true" ;;
+    r) CMD_MOUNT="false" ;;
     u) CMD_UNMOUNT="true" ;;
     h) print_usage
        exit 1 ;;
@@ -51,7 +51,7 @@ clear_ramdisk () {
 
 # pass in MB to fill ramdisk testfile with
 fill_ramdisk () {
-    dd < /dev/zero bs=1048576 count=$1 > ${TESTFILE}
+    dd < /dev/zero bs=1048576 count=$1 >> ${TESTFILE}
 }
 
 specify_memory () {
