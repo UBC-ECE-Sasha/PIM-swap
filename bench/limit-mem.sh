@@ -13,6 +13,7 @@ CMD_UNMOUNT="false"
 CMD_CLEAR="false"
 
 print_usage() {
+  echo "Limit memory on system using ramfs."
   echo "-d: ramfs directory"
   echo "-m: specify memory limit in MB"
   echo "-s: specify size of ramfs in MB (default will be slightly bigger than needed)"

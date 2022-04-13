@@ -5,6 +5,11 @@
 # Execute wtperf and log extra system statistics.
 # Usage: ./wtperf-test.sh [TEST_CONFIG] [MEM_LIMIT]
 
+if [ "$1" == "-h" ]; then
+  echo "Usage: ./wtperf-test.sh [TEST_CONFIG] [MEM_LIMIT]"
+  exit 0
+fi
+
 CONFIG=$1
 EXTRA_LOG_NAME=$2
 CONFIG_BASENAME="$(basename $CONFIG)"

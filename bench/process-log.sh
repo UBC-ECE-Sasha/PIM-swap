@@ -6,6 +6,11 @@
 # Automatically terminates when given PID terminates.
 # Usage: ./process-log.sh [PID] [LOG_DIR]
 
+if [ "$1" == "-h" ]; then
+  echo "Usage: ./process-log.sh [PID] [LOG_DIR]"
+  exit 0
+fi
+
 PID=$1
 LOG_DIR=$2
 
