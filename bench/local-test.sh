@@ -20,14 +20,14 @@ print_usage() {
   echo "-c: test config file"
   echo "-d: ramfs directory"
   echo "-m: specify memory limit in MB (0 for no limit)"
-  echo "-t: specify size of ramfs in MB (default will be slightly bigger than needed)"
+  echo "-t: specify timeout in s"
   echo "-u: unmount ramdisk after test"
   echo "-z: enable zswap"
   echo "-h: print this message"
   echo "read more at https://wiki.ubc.ca/PIM-SWAP"
 }
 
-while getopts 'c:m:t:uzh' flag; do
+while getopts 'c:d:m:t:uzh' flag; do
   case "${flag}" in
     c) TEST_CONFIG="${OPTARG}" ;;
     d) RAMFS_DIR="${OPTARG}" ;;
@@ -36,25 +36,21 @@ while getopts 'c:m:t:uzh' flag; do
     u) CMD_UMOUNT="true" ;;
     z) ZSWAP="true" ;;
     h) print_usage
-       exit 1 ;;
+       exit 0 ;;
     *) print_usage
        exit 1 ;;
   esac
 done
 
 if [ $MEM_LIMIT -gt 0 ]; then  
-  if [ $RAMDISK_SIZE -gt 0]; then
-    ./limit-mem.sh -r -d $RAMFS_DIR -m $MEM_LIMIT -s $RAMDISK_SIZE
-  else
-    ./limit-mem.sh -r -d $RAMFS_DIR -m $MEM_LIMIT
-  fi
+  ./limit-mem.sh -d $RAMFS_DIR -m $MEM_LIMIT
 fi
 
-if [ $ZSWAP == "true" ]; then
-  echo 1 > /sys/module/zswap/parameters/enabled
+if [ "$ZSWAP" == "true" ]; then
+  #sudo echo 1 > /sys/module/zswap/parameters/enabled
   LOG_EXTRA=ZSWAP_
-else
-  echo 0 > /sys/module/zswap/parameters/enabled
+#else
+  #sudo echo 0 > /sys/module/zswap/parameters/enabled
 fi
 
 LOG_EXTRA+=${MEM_LIMIT}M_
