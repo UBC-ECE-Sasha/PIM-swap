@@ -12,15 +12,15 @@ fi
 
 CONFIG=$1
 EXTRA_LOG_NAME=$2
-CONFIG_BASENAME="$(basename $CONFIG)"
+CONFIG_BASENAME="$(basename $CONFIG .wtperf)"
 
-WTPERF_LOC="wiredtiger/build_posix/bench/wtperf"
+WTPERF="./wiredtiger/build/bench/wtperf/wtperf"
 DB_DIR=/scratch/db/WT_TEST
 LOG_DIR="logs/WT_${CONFIG_BASENAME}_${EXTRA_LOG_NAME}$(date '+%Y-%m-%d--%H-%M-%S')"
 mkdir $LOG_DIR
 echo $LOG_DIR
 
-$WTPERF_LOC/wtperf -O $CONFIG -h $DB_DIR > $LOG_DIR/wt_out.log 2>&1 &
+$WTPERF -O $CONFIG -h $DB_DIR > $LOG_DIR/wt_out.log 2>&1 &
 WTPERF_PID=$!
 ./process-log.sh $WTPERF_PID $LOG_DIR
 

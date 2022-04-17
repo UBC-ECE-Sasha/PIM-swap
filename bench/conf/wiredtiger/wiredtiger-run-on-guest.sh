@@ -11,7 +11,7 @@ chmod +x mount_sdb.sh
 ./mount_sdb.sh
 
 mv wiredtiger /media/wiredtiger # move to larger shared drive
-cd /media/wiredtiger/build_posix/bench/wtperf
+cd /media/wiredtiger/build/bench/wtperf/wtperf
 ./wtperf -O ../../../bench/wtperf/runners/$CONFIG
 
 echo MONITOR CSV

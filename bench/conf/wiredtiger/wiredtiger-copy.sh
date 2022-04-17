@@ -7,7 +7,7 @@
 # Assumes SSH port of 10022
 
 WT_DIR="wiredtiger"
-WTPERF_PATH="${WT_DIR}/build_posix/bench/wtperf/wtperf"
+WTPERF_PATH="${WT_DIR}/build/bench/wtperf/wtperf"
 
 ./WT-make.sh
 

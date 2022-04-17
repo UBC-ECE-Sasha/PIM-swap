@@ -4,7 +4,7 @@
 #
 # Setup fresh server for PIM-swap benchmarking.
 
-sudo apt-get install sysstat
+sudo apt-get install sysstat cmake ccache ninja-build python3-dev swig
 
 mkdir /scratch/db
 chmod 777 /scratch/db
