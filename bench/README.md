@@ -3,7 +3,7 @@ The following are instructions for adding applications to PIM-swap benchmarking 
 
 ## Applications
 Benchmarking PIM-swap supports the following applications with their associated identifying log prefixes.
-- [wiredtiger](https://www.mongodb.com/docs/manual/core/wiredtiger/) (WT)
+- [wiredtiger](https://www.mongodb.com/docs/manual/core/wiredtiger/) release [3.2.1](https://github.com/wiredtiger/wiredtiger/releases/tag/mongodb-5.3.1) (WT)
 
 ## Adding an application
 The benchmarking framework is designed to be extendable to various applications. The following instructions walk through adding an application. All relevant locations in the code are marked with the comment `# ADD APPLICATION HERE (STEP X)` where X is the step number in the corresponding set of instructions.

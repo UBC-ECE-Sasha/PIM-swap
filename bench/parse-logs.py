@@ -18,34 +18,11 @@ def main():
     for logdir in args.logDirs:
         if not isinstance(logdir, Path):
             logdir = Path(logdir)
-        df = read_log(logdir, fullRun=args.fullRun)
-        if args.summarize:
-            sys_cols = [
-                "memory swapped in /s",
-                "memory swapped out /s",
-                "virt_mem_used",
-                "majflt/s",
-                "minflt/s",
-                "VSZ",
-                "RSS"
-            ]
-            if "WT" in logdir.stem:
-                if "ycsb-a" in logdir.stem:
-                    app_cols = [
-                        "wtperf.read.ops per sec",
-                        "wtperf.read.average latency",
-                        "wtperf.update.ops per sec",
-                        "wtperf.update.average latency"
-                    ]
-                else:
-                    app_cols = [
-                        "wtperf.read.ops per sec",
-                        "wtperf.read.average latency"
-                    ]
-            else:
-                app_cols = []
-            print(df[app_cols + sys_cols].describe().transpose())
+        df, start = read_log(logdir, fullRun=args.fullRun)
         df.to_csv(logdir / "output.csv")
+        sum_dict = summarize_log(df, start)
+        with open(logdir / "summary.json", "w") as f:
+            json.dump(sum_dict, f, indent=4)
 
 def read_log(logdir, fullRun=False):
     """
@@ -62,6 +39,7 @@ def read_log(logdir, fullRun=False):
     -------
     df : pandas.DataFrame
         A dataframe containing the data from the log files.
+    load_start : pandas.Timestamp
     """
     if not isinstance(logdir, Path):
         logdir = Path(logdir)
@@ -72,11 +50,11 @@ def read_log(logdir, fullRun=False):
     else:
         print("Unknown log type: {}".format(logdir.stem))
         return None
-        
+    load_start = None
     # ADD APPLICATION HERE (STEP 6)
     if application == "wiredtiger":
         app_log_path = logdir / "monitor.json"
-        app_log = read_wtperf_log(app_log_path, cropSetup=not fullRun)
+        app_log, load_start = read_wtperf_log(app_log_path, cropSetup=not fullRun)
         app_log.index = app_log.index.round("1s")
 
     pidstat_path = logdir / "pidstat.log"
@@ -89,12 +67,45 @@ def read_log(logdir, fullRun=False):
 
     # resample application df to 1 second
     freq = pd.infer_freq(df.index)
+    if freq == None:
+        print("Undiscernible frequency, setting to 1s")
+        freq = "1s"
+    
     app_log = app_log.resample(freq).bfill()
     if not fullRun:
         df = df.loc[app_log.index[0]:]
     df = df.join(app_log, how="outer")
 
-    return df
+    if load_start is None:
+        load_start = df.index[0]
+    else:
+        before_start = df.loc[:load_start].index
+        if len(before_start) > 0:
+            load_start = before_start[-1]
+        else:
+            load_start = df.index[0]
+        
+    return df, load_start
+
+def summarize_log(df, test_start=0):
+    test_df = df.loc[test_start:]
+    test_desc = test_df.describe().to_dict()
+
+    if test_start != df.index[0]:
+        setup_df = df.loc[:test_start]
+        setup_desc = setup_df.describe().to_dict()
+        ret_dict = {}
+        for k, v in setup_desc.items():
+            ret_dict["setup_" + k] = v
+        for k, v in test_desc.items():
+            ret_dict["test_" + k] = v
+    else:
+        ret_dict = test_desc
+    ret_dict["test_start"] = test_start
+    for k, v in ret_dict.items():
+        if isinstance(v, pd.Timestamp):
+            ret_dict[k] = v.strftime('%Y-%m-%d %X')
+    return ret_dict
 
 def read_wtperf_log(fname, cropSetup=True):
     f = open(fname, "r")
@@ -103,10 +114,10 @@ def read_wtperf_log(fname, cropSetup=True):
     monitor_df = pd.json_normalize(json_obj)
     monitor_df["localTime"] = pd.to_datetime(monitor_df["localTime"], utc=True)
     monitor_df.set_index("localTime", inplace=True)
+    start = find_wtperf_start(monitor_df)
     if cropSetup:
-        start = find_wtperf_start(monitor_df)
         monitor_df = monitor_df.loc[start:]
-    return monitor_df
+    return monitor_df, start
 
 # ADD APPLICATION HERE (STEP 5)
 
@@ -202,8 +213,6 @@ def parse_args():
         )
     parser.add_argument("--fullRun", "-f", action="store_true",
         help="Don't crop the data to start when the real workload starts.")
-    parser.add_argument("--summarize", "-s", action="store_true",
-        help="Print summary statistics of dataframe.")
     args = parser.parse_args()
     return args
 
