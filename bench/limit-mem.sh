@@ -80,7 +80,8 @@ specify_memory () {
 }
 
 mount_ramdisk () {
-    mount -t ramfs -o size=${RAMFS_SIZE}M ext4 ${RAMFS_DIR}
+    sudo mount -t ramfs -o size=${RAMFS_SIZE}M ext4 ${RAMFS_DIR}
+    sudo chmod 777 ${RAMFS_DIR}
 }
 
 umount_ramdisk () {
