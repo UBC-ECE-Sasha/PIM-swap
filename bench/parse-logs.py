@@ -18,13 +18,13 @@ def main():
     for logdir in args.logDirs:
         if not isinstance(logdir, Path):
             logdir = Path(logdir)
-        df, start = read_log(logdir, fullRun=args.fullRun)
+        df = read_log(logdir)
         df.to_csv(logdir / "output.csv")
-        sum_dict = summarize_log(df, start)
+        sum_dict = summarize_log(df)
         with open(logdir / "summary.json", "w") as f:
             json.dump(sum_dict, f, indent=4)
 
-def read_log(logdir, fullRun=False):
+def read_log(logdir):
     """
     Reads the log files from a PIM-swap benchmark run and outputs a dataframe of the data.
 
@@ -32,14 +32,10 @@ def read_log(logdir, fullRun=False):
     ----------
     logdir : str
         The directory containing the log files.
-    cropSetup : bool
-        If True, the setup phase is cropped from the data.
-    
     Returns
     -------
     df : pandas.DataFrame
         A dataframe containing the data from the log files.
-    load_start : pandas.Timestamp
     """
     if not isinstance(logdir, Path):
         logdir = Path(logdir)
@@ -54,7 +50,7 @@ def read_log(logdir, fullRun=False):
     # ADD APPLICATION HERE (STEP 6)
     if application == "wiredtiger":
         app_log_path = logdir / "monitor.json"
-        app_log, load_start = read_wtperf_log(app_log_path, cropSetup=not fullRun)
+        app_log, load_start = read_wtperf_log(app_log_path)
         app_log.index = app_log.index.round("1s")
 
     pidstat_path = logdir / "pidstat.log"
@@ -72,8 +68,6 @@ def read_log(logdir, fullRun=False):
         freq = "1s"
     
     app_log = app_log.resample(freq).bfill()
-    if not fullRun:
-        df = df.loc[app_log.index[0]:]
     df = df.join(app_log, how="outer")
 
     if load_start is None:
@@ -84,10 +78,12 @@ def read_log(logdir, fullRun=False):
             load_start = before_start[-1]
         else:
             load_start = df.index[0]
-        
-    return df, load_start
+    df.index = df.index - load_start
+    df.index.name = "time"
+    return df
 
-def summarize_log(df, test_start=0):
+def summarize_log(df):
+    test_start = pd.Timedelta("0s")
     test_df = df.loc[test_start:]
     test_desc = test_df.describe().to_dict()
 
@@ -98,16 +94,15 @@ def summarize_log(df, test_start=0):
         for k, v in setup_desc.items():
             ret_dict["setup_" + k] = v
         for k, v in test_desc.items():
-            ret_dict["test_" + k] = v
+            ret_dict[k] = v
     else:
         ret_dict = test_desc
-    ret_dict["test_start"] = test_start
     for k, v in ret_dict.items():
         if isinstance(v, pd.Timestamp):
             ret_dict[k] = v.strftime('%Y-%m-%d %X')
     return ret_dict
 
-def read_wtperf_log(fname, cropSetup=True):
+def read_wtperf_log(fname):
     f = open(fname, "r")
     f.readline()
     json_obj = [json.loads(line) for line in f]
@@ -115,8 +110,6 @@ def read_wtperf_log(fname, cropSetup=True):
     monitor_df["localTime"] = pd.to_datetime(monitor_df["localTime"], utc=True)
     monitor_df.set_index("localTime", inplace=True)
     start = find_wtperf_start(monitor_df)
-    if cropSetup:
-        monitor_df = monitor_df.loc[start:]
     return monitor_df, start
 
 # ADD APPLICATION HERE (STEP 5)
@@ -211,8 +204,6 @@ def parse_args():
         nargs='+',
         help="Log directories to read from."
         )
-    parser.add_argument("--fullRun", "-f", action="store_true",
-        help="Don't crop the data to start when the real workload starts.")
     args = parser.parse_args()
     return args
 
