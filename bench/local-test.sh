@@ -44,6 +44,9 @@ done
 
 if [ $MEM_LIMIT -gt 0 ]; then  
   ./limit-mem.sh -d $RAMFS_DIR -m $MEM_LIMIT
+else
+  MEM_AVAIL_KB=$(cat /proc/meminfo | grep MemAvailable | awk '{print $2}')
+  MEM_LIMIT=$((MEM_AVAIL_KB/1024))
 fi
 
 if [ "$ZSWAP" == "true" ]; then

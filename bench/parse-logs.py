@@ -59,7 +59,7 @@ def read_log(logdir):
     vmstat_path = logdir / "vmstat.log"
     mem_df = read_vmstat(vmstat_path)
 
-    df = mem_df.join(pidstat_df, how="outer")
+    df = mem_df.join(pidstat_df, how="inner")
 
     # resample application df to 1 second
     freq = pd.infer_freq(df.index)
@@ -68,7 +68,7 @@ def read_log(logdir):
         freq = "1s"
     
     app_log = app_log.resample(freq).bfill()
-    df = df.join(app_log, how="outer")
+    df = df.join(app_log, how="inner")
 
     if load_start is None:
         load_start = df.index[0]
