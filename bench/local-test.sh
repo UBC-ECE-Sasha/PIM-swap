@@ -50,10 +50,10 @@ else
 fi
 
 if [ "$ZSWAP" == "true" ]; then
-  #sudo echo 1 > /sys/module/zswap/parameters/enabled
+  sudo sh -c "echo 1 > /sys/module/zswap/parameters/enabled"
   LOG_EXTRA=ZSWAP_
-#else
-  #sudo echo 0 > /sys/module/zswap/parameters/enabled
+else
+  sudo sh -c "echo 0 > /sys/module/zswap/parameters/enabled"
 fi
 
 LOG_EXTRA+=${MEM_LIMIT}M_
