@@ -6,7 +6,7 @@
 
 PIMSWAP_VERSION = 1.0
 PIMSWAP_SOURCE = pimswap-$(PIMSWAP_VERSION).tar.bz2
-PIMSWAP_SITE ?= scp:///home/joel/projects/upmem/pim-swap
+PIMSWAP_SITE ?= /mnt/scratch/Systopia/PIM-swap/pim-swap
 PIMSWAP_LICENSE = Dual BSD/GPL
 
 PIMSWAP_CONF_OPTS = \

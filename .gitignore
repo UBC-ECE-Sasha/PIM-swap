@@ -1,8 +1,19 @@
+*DS_Store
 *.csv
 *.png
 *.out
 *.txt
 *.qcow2
+*.err
+*.log
 /*.raw
 /output/
 /.env
+/bench/logs/
+/bench/csvs/
+# ADD APPLICATION HERE (STEP 3)
+/bench/wiredtiger/
+/bench/WT_TEST/
+
+/bench/local_logs/
+*perf.data

@@ -1,1 +1,1 @@
-PIMSWAP_OVERRIDE_SRCDIR ?= /home/joel/projects/upmem/pim-swap/module
+PIMSWAP_OVERRIDE_SRCDIR ?= /mnt/scratch/Systopia/PIM-swap/module
