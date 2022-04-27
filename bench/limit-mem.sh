@@ -85,7 +85,7 @@ mount_ramdisk () {
 }
 
 umount_ramdisk () {
-    umount ${RAMFS_DIR}
+    sudo umount ${RAMFS_DIR}
 }
 
 if [ $CMD_CLEAR == "true" ]; then
