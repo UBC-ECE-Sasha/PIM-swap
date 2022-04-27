@@ -12,6 +12,7 @@ from pathlib import Path
 import pandas as pd
 import json
 import re
+import numpy as np
 
 def main():
     args = parse_args()
@@ -32,6 +33,7 @@ def read_log(logdir):
     ----------
     logdir : str
         The directory containing the log files.
+        
     Returns
     -------
     df : pandas.DataFrame
@@ -83,9 +85,22 @@ def read_log(logdir):
     return df
 
 def summarize_log(df):
+    """
+    Summarizes the data in a log dataframe into a dictionary.
+    
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        A dataframe containing the data from the log files.
+
+    Returns
+    -------
+    sum_dict : dict
+        A dictionary containing the summarized data.
+    """
     test_start = pd.Timedelta("0s")
     test_df = df.loc[test_start:]
-    test_desc = test_df.describe().to_dict()
+    test_desc = test_df.describe(include=[np.number]).to_dict()
 
     if test_start != df.index[0]:
         setup_df = df.loc[:test_start]
@@ -166,6 +181,14 @@ def read_pidstat(fname):
     
     pidstat_df = pd.DataFrame.from_dict(data_dict, orient="index")
     pidstat_df.index = pd.to_datetime(pidstat_df.index, utc=True)
+    
+    intcols = ["UID", "PID", "CPU", "VSZ", "RSS"]
+    floatcols = ["%%usr", "%%system", "%%guest", "%%wait", "%CPU", "%%MEM", "minflt/s", "majflt/s"]
+    for col in pidstat_df.columns:
+        if col in intcols:
+            pidstat_df[col] = pidstat_df[col].astype(int)
+        elif col in floatcols:
+            pidstat_df[col] = pidstat_df[col].astype(float)
     return pidstat_df
 
 def read_vmstat(fname, renameCols=True):
@@ -188,10 +211,19 @@ def read_vmstat(fname, renameCols=True):
         renameDict = {
             "swpd": "virt_mem_used",
             "free": "idle_mem",
+            "buff": "buffers memory",
+            "cache": "cache memory",
             "si": "memory swapped in /s",
             "so": "memory swapped out /s",
             "bi": "blocks received /s",
             "bo": "blocks sent /s",
+            "in": "interrupts received /s",
+            "cs": "context switches /s",
+            "us": "CPU time spent in user mode",
+            "sy": "CPU time spent in kernel",
+            "id": "CPU time spent idle",
+            "wa": "CPU time spent waiting for IO",
+            "st": "CPU time stolen"
         }
         vm_df.rename(columns=renameDict, inplace=True)
     return vm_df
