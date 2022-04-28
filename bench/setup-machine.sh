@@ -6,6 +6,10 @@
 
 sudo apt-get install sysstat cmake ccache ninja-build python3-dev swig
 
+cd dfsmon
+make
+cd -
+
 mkdir /scratch/db
 chmod 777 /scratch/db
 mkdir /scratch/ramdisk

@@ -28,7 +28,12 @@ vmstat -n -t 1 > $LOG_DIR/vmstat.log 2>&1 &
 MEMLOG_PID=$!
 ./log-pages.sh > $LOG_DIR/pages.csv 2>&1 &
 LOG_PID=$!
+./dfsmon/zswapmon $LOG_DIR/zswap.csv &
+ZSWAPMON_PID=$!
+
 perf record -e major-faults -e minor-faults -o $LOG_DIR/perf.data > $LOG_DIR/perf.log 2>&1 &
 pidstat -p $PID -r -u 1 > $LOG_DIR/pidstat.log 2>&1
+
 kill $MEMLOG_PID
 kill $LOG_PID
+kill $ZSWAPMON_PID
