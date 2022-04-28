@@ -1,59 +1,72 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <errno.h>
 #include "dfsmon.h"
 
+#define DEBUGFS_PATH "/sys/kernel/debug/"
+
 int monitor_debugfs(char** paths, char* outputfile, int n_paths, int interval_ms, int n_samples) {
     clock_t start_clk, elapsed_clk;
+    struct tm *tm;
+    char time_str[128];
+    time_t t;
     int ms_elapsed, ms_sleep;
-    uint64_t read_val;
-
-    FILE **fds = malloc(sizeof(FILE*) * n_paths);
-    for (int i = 0; i < n_paths; i++) {
-        fds[i] = fopen(paths[i], "rb");
-        if (fds[i] == NULL) {
-            for (int j = 0; j < i; j++) {
-                fclose(fds[j]);
-            }
-            return ENOENT;
-        }
-    }
+    int64_t read_val;
 
     /* Write CSV header */
     FILE *outfile = fopen(outputfile, "w");
+    char *name;
+    fprintf(outfile, "%s,", "timestamp");
     for (int i = 0; i < n_paths; i++) {
-        fprintf(outfile, "%s,", paths[i]);
+        name = paths[i];
+        if (strncmp(name, DEBUGFS_PATH, strlen(DEBUGFS_PATH)) == 0) {
+            name += strlen(DEBUGFS_PATH);
+        }
+        fprintf(outfile, "%s,", name);
     }
     fprintf(outfile, "\n");
 
     /* Write rows to CSV */
-    for (int i = 0; n_samples && i < n_samples; i++) {
+    for (int i = 0; !n_samples || i < n_samples; i++) {
         start_clk = clock();
+        t = time(NULL);
+        tm = localtime(&t);
+        strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", tm);
+        fprintf(outfile, "%s,", time_str);
         for (int j = 0; j < n_paths; j++) {
-            read_val = read_uint64(fds[j]);
-            fprintf(outfile, "%lu,", read_val);
+            FILE *fd = fopen(paths[j], "r");
+            if (fd == NULL) {
+                printf("Bad file %s\n", paths[i]);
+                errno = ENOENT;
+                return -1;
+            }
+            int n = read_write_str(fd, outfile);
+            fclose(fd);
         }
         fprintf(outfile, "\n");
-
+        fflush(outfile);
+        
         elapsed_clk = clock() - start_clk;
-        ms_elapsed = (int)(elapsed_clk * 1000 / CLOCKS_PER_SEC);
+        ms_elapsed = (int)(elapsed_clk * 1000.0 / CLOCKS_PER_SEC);
+        // printf("%d us elapsed\n", (int) (elapsed_clk * 1000000.0 / CLOCKS_PER_SEC));
         ms_sleep = interval_ms - ms_elapsed;
         if (ms_sleep > 0) {
             msleep(ms_sleep);
         }
     }
 
-    for (int i = 0; i < n_paths; i++) {
-        fclose(fds[i]);
-    }
     return 0;
 }
 
-uint64_t read_uint64(FILE* fd) {
-    uint64_t val;
-    fread(&val, sizeof(uint64_t), 1, fd);
-    return val;
+int read_write_str(FILE* input_fd, FILE* csv_fd) {
+    char buf[1024];
+    int n_read = fscanf(input_fd, "%s", buf);
+    //rewind(input_fd);
+    fprintf(csv_fd, "%s,", buf);
+    return n_read;
 }
 
 /* msleep(): Sleep for the requested number of milliseconds. From here https://stackoverflow.com/questions/1157209/is-there-an-alternative-sleep-function-in-c-to-milliseconds */
