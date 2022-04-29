@@ -63,6 +63,16 @@ def read_log(logdir):
 
     df = mem_df.join(pidstat_df, how="inner")
 
+    zswap_path = logdir / "zswap.csv"
+    if zswap_path.exists():
+        zswap_df = read_zswapmon(zswap_path)
+        df = df.join(zswap_df, how="inner")
+
+    pages_path = logdir / "pages.csv"
+    if pages_path.exists():
+        pages_df = read_pages(pages_path)
+        df = df.join(pages_df, how="inner")
+
     # resample application df to 1 second
     freq = pd.infer_freq(df.index)
     if freq == None:
@@ -82,6 +92,7 @@ def read_log(logdir):
             load_start = df.index[0]
     df.index = df.index - load_start
     df.index.name = "time"
+    add_composite_cols(df)
     return df
 
 def summarize_log(df):
@@ -209,8 +220,8 @@ def read_vmstat(fname, renameCols=True):
     
     if renameCols:
         renameDict = {
-            "swpd": "virt_mem_used",
-            "free": "idle_mem",
+            "swpd": "virt mem used",
+            "free": "free mem",
             "buff": "buffers memory",
             "cache": "cache memory",
             "si": "memory swapped in /s",
@@ -227,6 +238,33 @@ def read_vmstat(fname, renameCols=True):
         }
         vm_df.rename(columns=renameDict, inplace=True)
     return vm_df
+
+def read_zswapmon(fname):
+    df = pd.read_csv(fname, index_col=0, parse_dates=True)
+    df.index = df.index.tz_localize("UTC")
+    return df
+
+def read_pages(fname):
+    df = pd.read_csv(fname, index_col=0, parse_dates=True)
+    df.index = df.index.tz_localize("UTC")
+    return df
+
+def add_composite_cols(df):
+    # calculate compression ratio of zswap
+    if "zswap/stored_pages" in df.columns and "zswap/pool_total_size" in df.columns:
+        df["zswap_total_compression_ratio"] = df["zswap/stored_pages"]*4096 / df["zswap/pool_total_size"]
+        df.loc[~np.isfinite(df["zswap_total_compression_ratio"]), "zswap_total_compression_ratio"] = 0
+
+        if "zswap/same_filled_pages" in df.columns:
+            df["zswap_pure_compression_ratio"] = (df["zswap/stored_pages"] - df["zswap/same_filled_pages"])*4096 / df["zswap/pool_total_size"]
+            df.loc[~np.isfinite(df["zswap_pure_compression_ratio"]), "zswap_pure_compression_ratio"] = 0
+    
+    # calculate total physical memory used
+    if "Active(anon)" in df.columns:
+        if "Active(file)" in df.columns:
+            df["total_phy_mem_needed"] = df["Active(anon)"] + df["Active(file)"]
+        if "RSS" in df.columns:
+            df["total_phy_mem_used"] = df["RSS"] + df["Active(file)"]
 
 def parse_args():
     parser = argparse.ArgumentParser(

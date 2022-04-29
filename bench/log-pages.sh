@@ -22,11 +22,11 @@ print_line () {
     INACTIVE_A=$(grep -m 1 "Inactive(anon)" /proc/meminfo | awk '{ print $2 }')
     ACTIVE_F=$(grep -m 1 "Active(file)" /proc/meminfo | awk '{ print $2 }')
     INACTIVE_F=$(grep -m 1 "Inactive(file)" /proc/meminfo | awk '{ print $2 }')
-    echo "${DATE}, ${ACTIVE_A}, ${INACTIVE_A}, ${ACTIVE_F}, ${INACTIVE_F}"
+    echo "${DATE},${ACTIVE_A},${INACTIVE_A},${ACTIVE_F},${INACTIVE_F}"
     sleep $INTERVAL
 }
 
-echo "date, Active(anon), Inactive(anon), Active(file), Inactive(file)"
+echo "date,Active(anon),Inactive(anon),Active(file),Inactive(file)"
 
 if [ "$N_LOOPS" -gt 0 ]; then
     for I in 'seq 0 $N_LOOPS'
